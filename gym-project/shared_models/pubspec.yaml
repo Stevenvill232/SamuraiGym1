@@ -1,0 +1,27 @@
+name: shared_models
+description: >
+  Modelos, cliente HTTP, tema y constantes compartidas entre la app
+  administrativa (Flutter Desktop) y la app de miembros (Flutter móvil) del
+  sistema de gestión de gimnasio. Evita duplicar código de negocio entre las
+  dos apps y mantiene un solo lugar de verdad para los contratos con el
+  backend.
+version: 0.1.0
+publish_to: "none"
+
+environment:
+  sdk: ">=3.4.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  dio: ^5.4.3+1
+  intl: ^0.19.0
+  flutter_secure_storage: ^9.2.2
+  google_fonts: ^6.2.1
+
+# Nota: los modelos usan fromJson/toJson escritos a mano (sin build_runner)
+# a propósito, para que este paquete compile de inmediato sin pasos extra.
+# Si más adelante los modelos crecen mucho, se puede migrar a
+# json_serializable sin romper la API pública de estas clases.
+
+flutter:

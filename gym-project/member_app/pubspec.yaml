@@ -1,0 +1,35 @@
+name: gym_member_app
+description: >
+  Aplicación móvil (Android/iOS) para miembros del gimnasio: planes,
+  tiquetera, rutinas y alimentación por IA, chat y notificaciones push.
+version: 0.1.0
+publish_to: "none"
+
+environment:
+  sdk: ">=3.4.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_riverpod: ^2.5.1
+  go_router: ^14.2.7
+  fl_chart: ^0.68.0
+  intl: ^0.19.0
+
+  # Fase 6 (Notificaciones push). Descomenta cuando conectes Firebase:
+  # ejecuta `flutterfire configure` en esta carpeta antes de usarlos —
+  # ese comando necesita tu propia cuenta de Firebase y no puede
+  # ejecutarse en este entorno de generación de código.
+  firebase_core: ^3.6.0
+  firebase_messaging: ^15.1.3
+
+  shared_models:
+    path: ../shared_models
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true

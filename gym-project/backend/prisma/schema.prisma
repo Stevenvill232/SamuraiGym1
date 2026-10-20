@@ -1,0 +1,414 @@
+// ============================================================================
+// SCHEMA DE BASE DE DATOS - SISTEMA DE GESTIÓN DE GIMNASIO
+// PostgreSQL + Prisma ORM
+// ============================================================================
+// Convenciones:
+// - IDs como UUID (más seguros que autoincrementales para exponer en API)
+// - Montos con Decimal(10,2) para exactitud (nunca Float en dinero)
+// - Snapshots de precio en el momento de la transacción (Plan.precio,
+//   DetalleVenta.precioUnitario) para que un cambio de precio futuro NO
+//   modifique registros históricos (regla de negocio #13/#14 del proyecto)
+// - Eliminación lógica (campo `estado`) en vez de DELETE físico donde el
+//   histórico importa (Usuarios, Productos)
+// ============================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ----------------------------------------------------------------------------
+// ROLES Y PERMISOS
+// ----------------------------------------------------------------------------
+// Se modela como tabla (no enum fijo) porque el proyecto pide poder agregar
+// roles futuros (Recepción, Entrenador, Contador) sin tocar código ni migrar
+// el enum. Los permisos son granulares por módulo+acción para que cada rol
+// nuevo se configure combinando permisos existentes.
+
+model Role {
+  id        String       @id @default(uuid())
+  nombre    String       @unique // ADMINISTRADOR, MIEMBRO, RECEPCION, ENTRENADOR, CONTADOR
+  createdAt DateTime     @default(now())
+
+  usuarios  User[]
+  permisos  Permission[] @relation("RolePermisos")
+
+  @@map("roles")
+}
+
+model Permission {
+  id      String @id @default(uuid())
+  modulo  String // 'miembros' | 'planes_pagos' | 'contabilidad' | 'tienda' | 'configuracion' | 'ia'
+  accion  String // 'ver' | 'crear' | 'editar' | 'eliminar'
+  roles   Role[] @relation("RolePermisos")
+
+  @@unique([modulo, accion])
+  @@map("permisos")
+}
+
+// ----------------------------------------------------------------------------
+// USUARIOS (Administrador, staff y Miembros viven en la misma tabla; se
+// diferencian por Role. La cédula es el identificador de login y es inmutable
+// desde la app móvil — regla de negocio #10)
+// ----------------------------------------------------------------------------
+
+enum EstadoUsuario {
+  ACTIVO
+  INACTIVO
+}
+
+model User {
+  id              String        @id @default(uuid())
+  cedula          String        @unique
+  nombres         String
+  apellidos       String
+  fechaNacimiento DateTime?
+  celular         String?
+  correo          String?
+  direccion       String?
+  foto            String?
+  sexo            String?
+  passwordHash    String
+  fechaRegistro   DateTime      @default(now())
+  estado          EstadoUsuario @default(ACTIVO)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  roleId          String
+  role            Role          @relation(fields: [roleId], references: [id])
+
+  // Relaciones como MIEMBRO
+  planes                  Plan[]                     @relation("PlanesDelMiembro")
+  historialFisico         HistorialFisico[]
+  preferenciaAlimentacion PreferenciaAlimentacion?
+  rutinasGeneradas        RutinaGenerada[]
+  recomendaciones         RecomendacionAlimentaria[]
+  notificaciones          HistorialNotificacion[]
+  ingresosComoMiembro     Ingreso[]                  @relation("IngresoDelMiembro")
+
+  // Relaciones como STAFF/ADMIN (quién registró qué)
+  usosTiqueteraRegistrados UsoTiquetera[] @relation("UsoRegistradoPor")
+  ingresosRegistrados      Ingreso[]      @relation("IngresoRegistradoPor")
+  ventasRegistradas        Venta[]        @relation("VentaRegistradaPor")
+
+  @@index([estado])
+  @@map("usuarios")
+}
+
+// ----------------------------------------------------------------------------
+// PLANES (gimnasio, tiqueteras, boxeo/karate/mma)
+// ----------------------------------------------------------------------------
+
+enum TipoPlan {
+  GIMNASIO_SESION
+  GIMNASIO_QUINCENA
+  GIMNASIO_MES
+  TIQUETERA_10
+  TIQUETERA_15
+  TIQUETERA_20
+  TIQUETERA_30
+  BOXEO
+  KARATE
+  MMA
+}
+
+enum EstadoPlan {
+  ACTIVO
+  POR_VENCER
+  VENCIDO
+  AGOTADO
+}
+
+enum MetodoPago {
+  EFECTIVO
+  TRANSFERENCIA
+  NEQUI
+  DAVIPLATA
+  TARJETA
+  OTRO
+}
+
+model Plan {
+  id               String     @id @default(uuid())
+  miembroId        String
+  miembro          User       @relation("PlanesDelMiembro", fields: [miembroId], references: [id])
+  tipoPlan         TipoPlan
+  precio           Decimal    @db.Decimal(10, 2) // snapshot: precio pagado, no cambia si luego cambia la tarifa
+  fechaCompra      DateTime   @default(now())
+  fechaInicio      DateTime
+  fechaVencimiento DateTime   // para tiquetera = vigencia máxima; para mensualidad = fin del período
+  diasTotales      Int?       // solo tiqueteras
+  diasUtilizados   Int        @default(0) // solo tiqueteras
+  estado           EstadoPlan @default(ACTIVO)
+  metodoPago       MetodoPago
+  horarioId        String?
+  horario          Horario?   @relation(fields: [horarioId], references: [id])
+  observaciones    String?
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
+
+  usosTiquetera UsoTiquetera[]
+  ingresos      Ingreso[]
+
+  @@index([miembroId])
+  @@index([estado])
+  @@index([fechaVencimiento])
+  @@map("planes")
+}
+
+model UsoTiquetera {
+  id              String   @id @default(uuid())
+  planId          String
+  plan            Plan     @relation(fields: [planId], references: [id])
+  fechaUso        DateTime @default(now())
+  observacion     String?
+  registradoPorId String
+  registradoPor   User     @relation("UsoRegistradoPor", fields: [registradoPorId], references: [id])
+
+  @@index([planId])
+  @@map("usos_tiquetera")
+}
+
+enum Deporte {
+  BOXEO
+  KARATE
+  MMA
+}
+
+enum DiaSemana {
+  LUNES
+  MARTES
+  MIERCOLES
+  JUEVES
+  VIERNES
+  SABADO
+  DOMINGO
+}
+
+model Horario {
+  id         String    @id @default(uuid())
+  deporte    Deporte
+  dia        DiaSemana
+  horaInicio String    // "HH:mm"
+  horaFin    String    // "HH:mm"
+  cupo       Int?
+  estado     Boolean   @default(true)
+
+  planes Plan[]
+
+  @@index([deporte])
+  @@map("horarios")
+}
+
+// ----------------------------------------------------------------------------
+// CONTABILIDAD (ingresos, gastos)
+// ----------------------------------------------------------------------------
+
+enum TipoIngreso {
+  GIMNASIO_SESION
+  GIMNASIO_QUINCENA
+  GIMNASIO_MES
+  TIQUETERA
+  BOXEO
+  KARATE
+  MMA
+  PRODUCTO
+}
+
+model Ingreso {
+  id             String      @id @default(uuid())
+  fecha          DateTime    @default(now())
+  miembroId      String?
+  miembro        User?       @relation("IngresoDelMiembro", fields: [miembroId], references: [id])
+  concepto       String
+  tipo           TipoIngreso
+  planId         String?
+  plan           Plan?       @relation(fields: [planId], references: [id])
+  ventaId        String?     @unique
+  venta          Venta?      @relation(fields: [ventaId], references: [id])
+  valor          Decimal     @db.Decimal(10, 2)
+  metodoPago     MetodoPago
+  usuarioAdminId String
+  usuarioAdmin   User        @relation("IngresoRegistradoPor", fields: [usuarioAdminId], references: [id])
+  observacion    String?
+  createdAt      DateTime    @default(now())
+
+  @@index([fecha])
+  @@index([tipo])
+  @@map("ingresos")
+}
+
+enum CategoriaGasto {
+  LUZ
+  AGUA
+  NOMINA
+  ARRIENDO
+  INTERNET
+  MANTENIMIENTO
+  IMPLEMENTOS
+  OTRO
+}
+
+model Gasto {
+  id          String         @id @default(uuid())
+  fecha       DateTime       @default(now())
+  categoria   CategoriaGasto
+  descripcion String
+  valor       Decimal        @db.Decimal(10, 2)
+  metodoPago  MetodoPago
+  observacion String?
+  createdAt   DateTime       @default(now())
+
+  @@index([fecha])
+  @@index([categoria])
+  @@map("gastos")
+}
+
+// ----------------------------------------------------------------------------
+// TIENDA (productos, ventas)
+// ----------------------------------------------------------------------------
+
+model Producto {
+  id            String   @id @default(uuid())
+  nombre        String
+  descripcion   String?
+  categoria     String?
+  precioCompra  Decimal  @db.Decimal(10, 2)
+  precioVenta   Decimal  @db.Decimal(10, 2) // snapshot al vender: DetalleVenta.precioUnitario
+  stock         Int      @default(0)
+  stockMinimo   Int      @default(5)
+  foto          String?
+  estado        Boolean  @default(true)
+  fechaRegistro DateTime @default(now())
+
+  detallesVenta DetalleVenta[]
+
+  @@index([estado])
+  @@map("productos")
+}
+
+model Venta {
+  id         String     @id @default(uuid())
+  fecha      DateTime   @default(now())
+  total      Decimal    @db.Decimal(10, 2)
+  metodoPago MetodoPago
+  usuarioId  String
+  usuario    User       @relation("VentaRegistradaPor", fields: [usuarioId], references: [id])
+
+  detalles DetalleVenta[]
+  ingreso  Ingreso? // 1 venta -> 1 ingreso automático (regla de negocio #4)
+
+  @@index([fecha])
+  @@map("ventas")
+}
+
+model DetalleVenta {
+  id             String   @id @default(uuid())
+  ventaId        String
+  venta          Venta    @relation(fields: [ventaId], references: [id])
+  productoId     String
+  producto       Producto @relation(fields: [productoId], references: [id])
+  cantidad       Int
+  precioUnitario Decimal  @db.Decimal(10, 2) // snapshot del precio en el momento de la venta
+  subtotal       Decimal  @db.Decimal(10, 2)
+
+  @@map("detalle_ventas")
+}
+
+// ----------------------------------------------------------------------------
+// SALUD DEL MIEMBRO Y IA
+// ----------------------------------------------------------------------------
+
+model HistorialFisico {
+  id        String   @id @default(uuid())
+  miembroId String
+  miembro   User     @relation(fields: [miembroId], references: [id])
+  peso      Float
+  estatura  Float
+  fecha     DateTime @default(now())
+
+  @@index([miembroId])
+  @@map("historial_fisico")
+}
+
+// Datos permanentes de alimentación (se preguntan una sola vez, ver punto 17)
+model PreferenciaAlimentacion {
+  miembroId             String   @id
+  miembro               User     @relation(fields: [miembroId], references: [id])
+  objetivo              String?
+  tipoDieta             String?
+  alimentosNoConsumidos String[] @default([])
+  alergias              String[] @default([])
+  preferencias          String[] @default([])
+  presupuesto           Decimal? @db.Decimal(10, 2)
+  updatedAt             DateTime @updatedAt
+
+  @@map("preferencias_alimentacion")
+}
+
+model RutinaGenerada {
+  id                String   @id @default(uuid())
+  miembroId         String
+  miembro           User     @relation(fields: [miembroId], references: [id])
+  fecha             DateTime @default(now())
+  objetivo          String?
+  nivel             String?
+  intensidad        String?
+  contenidoGenerado Json // { calentamiento, ejercicios[], series, repeticiones, descanso, duracion, recomendaciones }
+  createdAt         DateTime @default(now())
+
+  @@index([miembroId])
+  @@map("rutinas_generadas")
+}
+
+enum TipoComida {
+  DESAYUNO
+  MEDIA_MANANA
+  ALMUERZO
+  MERIENDA
+  CENA
+}
+
+model RecomendacionAlimentaria {
+  id                String     @id @default(uuid())
+  miembroId         String
+  miembro           User       @relation(fields: [miembroId], references: [id])
+  fecha             DateTime   @default(now())
+  tipoComida        TipoComida
+  contenidoGenerado Json // { alimentosSugeridos[], porciones, alternativas[], recomendaciones }
+  createdAt         DateTime   @default(now())
+
+  @@index([miembroId])
+  @@map("recomendaciones_alimentarias")
+}
+
+model HistorialNotificacion {
+  id         String   @id @default(uuid())
+  miembroId  String
+  miembro    User     @relation(fields: [miembroId], references: [id])
+  titulo     String
+  mensaje    String
+  tipo       String // 'VENCIMIENTO_PLAN' | 'TIQUETERA' | 'PAGO' | 'GENERAL'
+  leida      Boolean  @default(false)
+  fechaEnvio DateTime @default(now())
+
+  @@index([miembroId])
+  @@map("historial_notificaciones")
+}
+
+// ----------------------------------------------------------------------------
+// CONFIGURACIÓN GENERAL (clave-valor flexible: precios, categorías, info del
+// gimnasio, etc. — evita migrar el schema cada vez que se agrega un ajustable)
+// ----------------------------------------------------------------------------
+
+model Configuracion {
+  clave     String   @id // ej: 'precios_planes', 'precios_tiqueteras', 'info_gimnasio'
+  valor     Json
+  updatedAt DateTime @updatedAt
+
+  @@map("configuracion")
+}
