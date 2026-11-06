@@ -7,3 +7,4 @@ export 'src/models/plan.dart';
 export 'src/network/api_client.dart';
 export 'src/network/api_exception.dart';
 export 'src/theme/app_theme.dart';
+export 'src/utils/formato_fecha.dart';

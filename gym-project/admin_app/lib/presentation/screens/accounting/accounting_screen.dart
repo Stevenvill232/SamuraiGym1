@@ -8,7 +8,6 @@ import '../../widgets/dashboard/kpi_card.dart';
 
 final _formatoMoneda =
     NumberFormat.currency(locale: 'es_CO', symbol: '\$', decimalDigits: 0);
-final _formatoFecha = DateFormat('d MMM', 'es');
 
 class AccountingScreen extends ConsumerWidget {
   const AccountingScreen({super.key});
@@ -164,7 +163,7 @@ class _ListaMovimientos extends StatelessWidget {
           child: ListTile(
             title: Text(m.concepto),
             subtitle: Text('${m.tipoOCategoria} · ${m.metodoPago} · '
-                '${_formatoFecha.format(m.fecha)}'),
+                '${FormatoFecha.corta(m.fecha)}'),
             trailing: Text(
               _formatoMoneda.format(m.valor),
               style: TextStyle(

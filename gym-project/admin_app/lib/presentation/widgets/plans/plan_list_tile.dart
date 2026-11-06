@@ -3,7 +3,6 @@ import 'package:intl/intl.dart';
 import 'package:shared_models/shared_models.dart';
 import '../../../providers/plans_provider.dart';
 
-final _formatoFecha = DateFormat('d MMM yyyy', 'es');
 final _formatoMoneda =
     NumberFormat.currency(locale: 'es_CO', symbol: '\$', decimalDigits: 0);
 
@@ -63,9 +62,9 @@ class PlanListTile extends StatelessWidget {
                         style: const TextStyle(color: AppColors.textMuted)),
                   Text(
                     plan.diasTotales != null
-                        ? 'Vence ${_formatoFecha.format(plan.fechaVencimiento)} · '
+                        ? 'Vence ${FormatoFecha.conAnio(plan.fechaVencimiento)} · '
                             '${plan.diasRestantes} de ${plan.diasTotales} días disponibles'
-                        : 'Vence ${_formatoFecha.format(plan.fechaVencimiento)}',
+                        : 'Vence ${FormatoFecha.conAnio(plan.fechaVencimiento)}',
                     style: const TextStyle(
                         color: AppColors.textMuted, fontSize: 13),
                   ),
