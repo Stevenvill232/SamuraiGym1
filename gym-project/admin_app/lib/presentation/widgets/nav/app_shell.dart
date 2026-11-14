@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_models/shared_models.dart';
+import '../../../core/permissions.dart';
 import '../../../providers/auth_provider.dart';
+import '../../../providers/me_provider.dart';
 
 class _NavItem {
   final String path;
@@ -20,19 +22,17 @@ const _items = [
   _NavItem('/settings', Icons.settings_rounded, 'Configuración'),
 ];
 
-/// Shell con menú lateral, requerido explícitamente por el proyecto:
-/// "Debe tener un menú lateral ... con los siguientes módulos: Dashboard,
-/// Miembros, Planes y Pagos, Contabilidad, Tienda, Configuración".
+/// Shell con menú lateral. Cada rol ve únicamente los módulos que le
+/// corresponden (ver core/permissions.dart).
 class AppShell extends ConsumerWidget {
   final Widget child;
   const AppShell({super.key, required this.child});
 
-  String _currentPath(BuildContext context) =>
-      GoRouterState.of(context).matchedLocation;
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final currentPath = _currentPath(context);
+    final currentPath = GoRouterState.of(context).matchedLocation;
+    final rol = ref.watch(meProvider).valueOrNull?.role;
+    final visibles = _items.where((i) => puedeVer(i.path, rol)).toList();
 
     return Scaffold(
       body: Row(
@@ -44,27 +44,38 @@ class AppShell extends ConsumerWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const Padding(
-                    padding: EdgeInsets.fromLTRB(20, 24, 20, 24),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 24, 20, 24),
                     child: Row(
                       children: [
-                        Icon(Icons.fitness_center_rounded,
+                        const Icon(Icons.fitness_center_rounded,
                             color: AppColors.ember, size: 28),
-                        SizedBox(width: 10),
+                        const SizedBox(width: 10),
                         Expanded(
-                          child: Text(
-                            'Gym Admin',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 18,
-                              fontWeight: FontWeight.w700,
-                            ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Gym Admin',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              if (rol != null)
+                                Text(
+                                  etiquetaRol(rol),
+                                  style: const TextStyle(
+                                      color: Colors.white54, fontSize: 12),
+                                ),
+                            ],
                           ),
                         ),
                       ],
                     ),
                   ),
-                  ..._items.map((item) {
+                  ...visibles.map((item) {
                     final selected = currentPath == item.path;
                     return Padding(
                       padding:

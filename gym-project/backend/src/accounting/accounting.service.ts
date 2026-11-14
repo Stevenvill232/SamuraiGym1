@@ -1,18 +1,26 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { SettingsService } from '../settings/settings.service';
 import { CreateGastoDto, QueryMovimientosDto } from './dto/accounting.dto';
 
 @Injectable()
 export class AccountingService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private settings: SettingsService,
+  ) {}
 
-  createGasto(dto: CreateGastoDto) {
+  async createGasto(dto: CreateGastoDto) {
+    // Validaciones críticas en backend contra los catálogos configurables.
+    await this.settings.assertCategoriaGasto(dto.categoria);
+    await this.settings.assertMetodoPago(dto.metodoPago);
+
     return this.prisma.gasto.create({
       data: {
-        categoria: dto.categoria as any,
+        categoria: dto.categoria,
         descripcion: dto.descripcion,
         valor: dto.valor,
-        metodoPago: dto.metodoPago as any,
+        metodoPago: dto.metodoPago,
         observacion: dto.observacion,
       },
     });

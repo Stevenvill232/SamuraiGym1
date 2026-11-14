@@ -90,6 +90,18 @@ class ApiClient {
     }
   }
 
+  Future<Map<String, dynamic>> put(
+    String path, {
+    Map<String, dynamic>? body,
+  }) async {
+    try {
+      final res = await _dio.put(path, data: body);
+      return res.data as Map<String, dynamic>;
+    } on DioException catch (e) {
+      throw _mapError(e);
+    }
+  }
+
   Future<void> delete(String path) async {
     try {
       await _dio.delete(path);
@@ -111,7 +123,15 @@ class ApiClient {
         (data is Map && data['message'] != null) ? data['message'] : null;
 
     if (status == 401) {
-      return ApiException.credencialesInvalidas();
+      // Solo el login con datos incorrectos es "credenciales inválidas";
+      // un 401 en cualquier otra llamada significa que el token venció.
+      final esLogin = e.requestOptions.path.contains('/auth/login');
+      return esLogin
+          ? ApiException.credencialesInvalidas()
+          : ApiException.sesionExpirada();
+    }
+    if (status == 403) {
+      return ApiException.sinPermiso();
     }
     if (status != null && status >= 500) {
       return ApiException.servidor();

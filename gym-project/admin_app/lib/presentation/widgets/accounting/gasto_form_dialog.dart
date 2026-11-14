@@ -2,26 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_models/shared_models.dart';
 import '../../../providers/accounting_provider.dart';
-
-const _categorias = [
-  'LUZ',
-  'AGUA',
-  'NOMINA',
-  'ARRIENDO',
-  'INTERNET',
-  'MANTENIMIENTO',
-  'IMPLEMENTOS',
-  'OTRO',
-];
-
-const _metodosPago = [
-  'EFECTIVO',
-  'TRANSFERENCIA',
-  'NEQUI',
-  'DAVIPLATA',
-  'TARJETA',
-  'OTRO',
-];
+import '../../../providers/settings_provider.dart';
 
 class GastoFormDialog extends ConsumerStatefulWidget {
   const GastoFormDialog({super.key});
@@ -35,10 +16,20 @@ class _GastoFormDialogState extends ConsumerState<GastoFormDialog> {
   final _descripcionCtrl = TextEditingController();
   final _valorCtrl = TextEditingController();
   final _observacionCtrl = TextEditingController();
-  String _categoria = 'OTRO';
-  String _metodoPago = 'EFECTIVO';
+  late String _categoria;
+  late String _metodoPago;
   bool _guardando = false;
   String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    final cfg = ref.read(settingsProvider).settings;
+    _categoria = cfg.categoriasGasto.contains('OTRO')
+        ? 'OTRO'
+        : cfg.categoriasGasto.first;
+    _metodoPago = cfg.metodosPago.first;
+  }
 
   @override
   void dispose() {
@@ -76,6 +67,7 @@ class _GastoFormDialogState extends ConsumerState<GastoFormDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final cfg = ref.watch(settingsProvider).settings;
     return Dialog(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 420),
@@ -93,7 +85,7 @@ class _GastoFormDialogState extends ConsumerState<GastoFormDialog> {
                 DropdownButtonFormField<String>(
                   value: _categoria,
                   decoration: const InputDecoration(labelText: 'Categoría'),
-                  items: _categorias
+                  items: cfg.categoriasGasto
                       .map((c) => DropdownMenuItem(value: c, child: Text(c)))
                       .toList(),
                   onChanged: (v) => setState(() => _categoria = v!),
@@ -127,7 +119,7 @@ class _GastoFormDialogState extends ConsumerState<GastoFormDialog> {
                         value: _metodoPago,
                         decoration:
                             const InputDecoration(labelText: 'Método de pago'),
-                        items: _metodosPago
+                        items: cfg.metodosPago
                             .map((m) =>
                                 DropdownMenuItem(value: m, child: Text(m)))
                             .toList(),

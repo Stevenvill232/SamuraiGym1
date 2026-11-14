@@ -1,6 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
   IsEnum,
+  IsNotEmpty,
   IsNumber,
   IsOptional,
   IsPositive,
@@ -26,15 +27,6 @@ export enum TipoPlanDto {
   MMA = 'MMA',
 }
 
-export enum MetodoPagoDto {
-  EFECTIVO = 'EFECTIVO',
-  TRANSFERENCIA = 'TRANSFERENCIA',
-  NEQUI = 'NEQUI',
-  DAVIPLATA = 'DAVIPLATA',
-  TARJETA = 'TARJETA',
-  OTRO = 'OTRO',
-}
-
 export enum EstadoPlanDto {
   ACTIVO = 'ACTIVO',
   POR_VENCER = 'POR_VENCER',
@@ -56,9 +48,10 @@ export class CreatePlanDto {
   @IsPositive()
   precio: number;
 
-  @ApiProperty({ enum: MetodoPagoDto })
-  @IsEnum(MetodoPagoDto)
-  metodoPago: MetodoPagoDto;
+  @ApiProperty({ example: 'EFECTIVO', description: 'Debe existir en Configuración > Métodos de pago' })
+  @IsString()
+  @IsNotEmpty()
+  metodoPago: string;
 
   @ApiPropertyOptional({
     description: 'Requerido si tipoPlan es BOXEO, KARATE o MMA',

@@ -3,7 +3,7 @@ import { Type } from 'class-transformer';
 import {
   ArrayMinSize,
   IsArray,
-  IsEnum,
+  IsNotEmpty,
   IsInt,
   IsNumber,
   IsOptional,
@@ -13,15 +13,6 @@ import {
   Min,
   ValidateNested,
 } from 'class-validator';
-
-export enum MetodoPagoDto {
-  EFECTIVO = 'EFECTIVO',
-  TRANSFERENCIA = 'TRANSFERENCIA',
-  NEQUI = 'NEQUI',
-  DAVIPLATA = 'DAVIPLATA',
-  TARJETA = 'TARJETA',
-  OTRO = 'OTRO',
-}
 
 export class CreateProductoDto {
   @ApiProperty({ example: 'Proteína whey 1kg' })
@@ -86,7 +77,8 @@ export class CreateVentaDto {
   @Type(() => ItemVentaDto)
   items: ItemVentaDto[];
 
-  @ApiProperty({ enum: MetodoPagoDto })
-  @IsEnum(MetodoPagoDto)
-  metodoPago: MetodoPagoDto;
+  @ApiProperty({ example: 'EFECTIVO' })
+  @IsString()
+  @IsNotEmpty()
+  metodoPago: string;
 }

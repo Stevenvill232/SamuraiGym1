@@ -1,4 +1,8 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../prisma/prisma.service';
@@ -54,5 +58,31 @@ export class AuthService {
         role: user.role.nombre,
       },
     };
+  }
+
+  /**
+   * Cambio de contraseña del propio usuario. Si la actual es incorrecta se
+   * responde 400 (no 401) para que la app no lo confunda con una sesión
+   * vencida.
+   */
+  async cambiarPassword(userId: string, actual: string, nueva: string) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new UnauthorizedException();
+
+    const ok = await bcrypt.compare(actual, user.passwordHash);
+    if (!ok) {
+      throw new BadRequestException('La contraseña actual es incorrecta');
+    }
+    if (actual === nueva) {
+      throw new BadRequestException(
+        'La nueva contraseña debe ser distinta a la actual',
+      );
+    }
+
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { passwordHash: await bcrypt.hash(nueva, 10) },
+    });
+    return { message: 'Contraseña actualizada correctamente' };
   }
 }

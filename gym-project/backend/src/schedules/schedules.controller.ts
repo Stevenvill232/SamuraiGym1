@@ -27,7 +27,7 @@ import { Roles } from '../common/decorators/roles.decorator';
 export class SchedulesController {
   constructor(private service: SchedulesService) {}
 
-  @Roles('ADMINISTRADOR')
+  @Roles('ADMINISTRADOR', 'ENTRENADOR')
   @Post()
   create(@Body() dto: CreateHorarioDto) {
     return this.service.create(dto);
@@ -45,13 +45,13 @@ export class SchedulesController {
     return this.service.findOne(id);
   }
 
-  @Roles('ADMINISTRADOR')
+  @Roles('ADMINISTRADOR', 'ENTRENADOR')
   @Patch(':id')
   update(@Param('id') id: string, @Body() dto: UpdateHorarioDto) {
     return this.service.update(id, dto);
   }
 
-  @Roles('ADMINISTRADOR')
+  @Roles('ADMINISTRADOR', 'ENTRENADOR')
   @Delete(':id')
   remove(@Param('id') id: string) {
     return this.service.remove(id);

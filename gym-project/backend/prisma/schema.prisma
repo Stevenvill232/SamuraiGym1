@@ -85,6 +85,7 @@ model User {
   planes                  Plan[]                     @relation("PlanesDelMiembro")
   historialFisico         HistorialFisico[]
   preferenciaAlimentacion PreferenciaAlimentacion?
+  perfilEntrenamiento      PerfilEntrenamiento?
   rutinasGeneradas        RutinaGenerada[]
   recomendaciones         RecomendacionAlimentaria[]
   notificaciones          HistorialNotificacion[]
@@ -123,15 +124,6 @@ enum EstadoPlan {
   AGOTADO
 }
 
-enum MetodoPago {
-  EFECTIVO
-  TRANSFERENCIA
-  NEQUI
-  DAVIPLATA
-  TARJETA
-  OTRO
-}
-
 model Plan {
   id               String     @id @default(uuid())
   miembroId        String
@@ -144,7 +136,7 @@ model Plan {
   diasTotales      Int?       // solo tiqueteras
   diasUtilizados   Int        @default(0) // solo tiqueteras
   estado           EstadoPlan @default(ACTIVO)
-  metodoPago       MetodoPago
+  metodoPago       String
   horarioId        String?
   horario          Horario?   @relation(fields: [horarioId], references: [id])
   observaciones    String?
@@ -231,7 +223,7 @@ model Ingreso {
   ventaId        String?     @unique
   venta          Venta?      @relation(fields: [ventaId], references: [id])
   valor          Decimal     @db.Decimal(10, 2)
-  metodoPago     MetodoPago
+  metodoPago     String
   usuarioAdminId String
   usuarioAdmin   User        @relation("IngresoRegistradoPor", fields: [usuarioAdminId], references: [id])
   observacion    String?
@@ -242,24 +234,13 @@ model Ingreso {
   @@map("ingresos")
 }
 
-enum CategoriaGasto {
-  LUZ
-  AGUA
-  NOMINA
-  ARRIENDO
-  INTERNET
-  MANTENIMIENTO
-  IMPLEMENTOS
-  OTRO
-}
-
 model Gasto {
   id          String         @id @default(uuid())
   fecha       DateTime       @default(now())
-  categoria   CategoriaGasto
+  categoria   String
   descripcion String
   valor       Decimal        @db.Decimal(10, 2)
-  metodoPago  MetodoPago
+  metodoPago  String
   observacion String?
   createdAt   DateTime       @default(now())
 
@@ -295,7 +276,7 @@ model Venta {
   id         String     @id @default(uuid())
   fecha      DateTime   @default(now())
   total      Decimal    @db.Decimal(10, 2)
-  metodoPago MetodoPago
+  metodoPago String
   usuarioId  String
   usuario    User       @relation("VentaRegistradaPor", fields: [usuarioId], references: [id])
 
@@ -344,10 +325,29 @@ model PreferenciaAlimentacion {
   alimentosNoConsumidos String[] @default([])
   alergias              String[] @default([])
   preferencias          String[] @default([])
+  alimentosNoGustan     String[] @default([])
+  restricciones         String[] @default([])
+  numeroComidas         Int?
   presupuesto           Decimal? @db.Decimal(10, 2)
   updatedAt             DateTime @updatedAt
 
   @@map("preferencias_alimentacion")
+}
+
+// Datos PERMANENTES para generar rutinas con IA (se piden una sola vez)
+model PerfilEntrenamiento {
+  miembroId        String   @id
+  miembro          User     @relation(fields: [miembroId], references: [id])
+  objetivo         String?
+  nivel            String? // PRINCIPIANTE | INTERMEDIO | AVANZADO
+  lesiones         String[] @default([])
+  equipamiento     String[] @default([])
+  diasDisponibles  String[] @default([])
+  minutosPorSesion Int?
+  preferencias     String[] @default([])
+  updatedAt        DateTime @updatedAt
+
+  @@map("perfil_entrenamiento")
 }
 
 model RutinaGenerada {

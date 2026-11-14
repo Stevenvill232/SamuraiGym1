@@ -6,6 +6,7 @@ class MemberListTile extends StatelessWidget {
   final VoidCallback onEdit;
   final VoidCallback onDelete;
   final VoidCallback onVerPlanes;
+  final VoidCallback onResetPassword;
 
   const MemberListTile({
     super.key,
@@ -13,6 +14,7 @@ class MemberListTile extends StatelessWidget {
     required this.onEdit,
     required this.onDelete,
     required this.onVerPlanes,
+    required this.onResetPassword,
   });
 
   @override
@@ -46,6 +48,11 @@ class MemberListTile extends StatelessWidget {
               tooltip: 'Ver planes',
               icon: const Icon(Icons.card_membership_outlined),
               onPressed: onVerPlanes,
+            ),
+            IconButton(
+              tooltip: 'Restablecer contraseña',
+              icon: const Icon(Icons.lock_reset_rounded),
+              onPressed: onResetPassword,
             ),
             IconButton(
               tooltip: 'Editar',

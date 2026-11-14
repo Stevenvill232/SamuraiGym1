@@ -16,6 +16,28 @@ class FormatoFecha {
     'jul', 'ago', 'sep', 'oct', 'nov', 'dic',
   ];
 
+  static const _mesesLargos = [
+    'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
+    'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre',
+  ];
+
+  /// Ejemplo: "05/11"
+  static String diaMes(DateTime fecha) {
+    final f = fecha.toLocal();
+    return '${f.day.toString().padLeft(2, '0')}/${f.month.toString().padLeft(2, '0')}';
+  }
+
+  /// Ejemplo: "5 de noviembre"
+  static String diaMesLargo(DateTime fecha) {
+    final f = fecha.toLocal();
+    return '${f.day} de ${_mesesLargos[f.month - 1]}';
+  }
+
+  /// Para fechas de calendario puras (ej. cumpleaños), que NO deben
+  /// convertirse de zona horaria. Ejemplo: "14/5/1998"
+  static String sinZona(DateTime fecha) =>
+      '${fecha.day}/${fecha.month}/${fecha.year}';
+
   /// Ejemplo: "5 nov"
   static String corta(DateTime fecha) {
     final f = fecha.toLocal();

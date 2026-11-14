@@ -4,32 +4,51 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { SettingsService } from '../settings/settings.service';
 import {
   CreatePlanDto,
   QueryPlanDto,
   UsarTiqueteraDto,
   TipoPlanDto,
-  EstadoPlanDto,
 } from './dto/plan.dto';
+import { DIA_MS, calcularEstadoPlan } from './plan-estado.util';
 
-const DIA_MS = 24 * 60 * 60 * 1000;
 const DEPORTES: TipoPlanDto[] = [
   TipoPlanDto.BOXEO,
   TipoPlanDto.KARATE,
   TipoPlanDto.MMA,
 ];
 
+const MIEMBRO_SELECT = {
+  id: true,
+  nombres: true,
+  apellidos: true,
+  cedula: true,
+  foto: true,
+};
+
 @Injectable()
 export class PlansService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private settings: SettingsService,
+  ) {}
 
   async create(dto: CreatePlanDto, adminId: string) {
     const miembro = await this.prisma.user.findUnique({
       where: { id: dto.miembroId },
+      include: { role: true },
     });
     if (!miembro || miembro.estado === 'INACTIVO') {
       throw new NotFoundException('Miembro no encontrado');
     }
+    if (miembro.role.nombre !== 'MIEMBRO') {
+      throw new BadRequestException(
+        'Solo se pueden registrar planes a miembros del gimnasio',
+      );
+    }
+
+    await this.settings.assertMetodoPago(dto.metodoPago);
 
     const esDeporte = DEPORTES.includes(dto.tipoPlan);
     if (esDeporte && !dto.horarioId) {
@@ -46,10 +65,12 @@ export class PlansService {
       }
     }
 
+    const factor = await this.settings.get<number>('tiquetera_factor_vigencia');
     const fechaInicio = new Date();
     const { fechaVencimiento, diasTotales } = this.calcularVigencia(
       dto.tipoPlan,
       fechaInicio,
+      factor,
     );
 
     const plan = await this.prisma.$transaction(async (tx: any) => {
@@ -61,14 +82,13 @@ export class PlansService {
           fechaInicio,
           fechaVencimiento,
           diasTotales,
-          metodoPago: dto.metodoPago as any,
+          metodoPago: dto.metodoPago,
           horarioId: dto.horarioId,
           observaciones: dto.observaciones,
         },
       });
 
-      // Todo plan pagado genera su ingreso en la misma transacción: si algo
-      // falla, ninguno de los dos queda a medias (ver ARQUITECTURA.md 7.3).
+      // Todo plan pagado genera su ingreso en la misma transacción.
       await tx.ingreso.create({
         data: {
           miembroId: dto.miembroId,
@@ -76,7 +96,7 @@ export class PlansService {
           tipo: this.tipoIngresoDesde(dto.tipoPlan) as any,
           planId: nuevoPlan.id,
           valor: dto.precio,
-          metodoPago: dto.metodoPago as any,
+          metodoPago: dto.metodoPago,
           usuarioAdminId: adminId,
         },
       });
@@ -87,23 +107,18 @@ export class PlansService {
     return this.findOne(plan.id);
   }
 
-  async findAll(query: QueryPlanDto) {
+  async findAll(query: QueryPlanDto, incluirUsos = false) {
     const planes = await this.prisma.plan.findMany({
       where: {
         miembroId: query.miembroId,
         estado: query.estado as any,
       },
       include: {
-        miembro: {
-          select: {
-            id: true,
-            nombres: true,
-            apellidos: true,
-            cedula: true,
-            foto: true,
-          },
-        },
+        miembro: { select: MIEMBRO_SELECT },
         horario: true,
+        ...(incluirUsos
+          ? { usosTiquetera: { orderBy: { fechaUso: 'asc' } } }
+          : {}),
       },
       orderBy: { fechaCompra: 'desc' },
     });
@@ -115,15 +130,7 @@ export class PlansService {
     const plan = await this.prisma.plan.findUnique({
       where: { id },
       include: {
-        miembro: {
-          select: {
-            id: true,
-            nombres: true,
-            apellidos: true,
-            cedula: true,
-            foto: true,
-          },
-        },
+        miembro: { select: MIEMBRO_SELECT },
         horario: true,
         usosTiquetera: { orderBy: { fechaUso: 'desc' } },
       },
@@ -132,19 +139,12 @@ export class PlansService {
     return this.conEstadoActualizado(plan);
   }
 
+  /** Planes del propio miembro, con el historial de días de tiquetera. */
   findByMiembro(miembroId: string) {
-    return this.findAll({ miembroId } as QueryPlanDto);
+    return this.findAll({ miembroId } as QueryPlanDto, true);
   }
 
-  /**
-   * Registra el uso de un día de tiquetera. Válido solo si aún quedan
-   * días disponibles y la vigencia no ha vencido.
-   */
-  async usarTiquetera(
-    planId: string,
-    adminId: string,
-    dto: UsarTiqueteraDto,
-  ) {
+  async usarTiquetera(planId: string, adminId: string, dto: UsarTiqueteraDto) {
     const plan = await this.prisma.plan.findUnique({ where: { id: planId } });
     if (!plan) throw new NotFoundException('Plan no encontrado');
 
@@ -160,9 +160,7 @@ export class PlansService {
 
     const diasUtilizados = plan.diasUtilizados + 1;
     const nuevoEstado =
-      diasUtilizados >= plan.diasTotales
-        ? EstadoPlanDto.AGOTADO
-        : (plan.estado as EstadoPlanDto);
+      diasUtilizados >= plan.diasTotales ? 'AGOTADO' : plan.estado;
 
     await this.prisma.$transaction([
       this.prisma.usoTiquetera.create({
@@ -182,41 +180,41 @@ export class PlansService {
   }
 
   /**
-   * Define cuánto dura cada tipo de plan a partir de hoy.
-   *
-   * Decisión de negocio (documentada también en ARQUITECTURA.md): la
-   * vigencia máxima de una tiquetera es el DOBLE de sus días (ej. una
-   * tiquetera de 10 días debe usarse dentro de 20 días calendario). Es un
-   * valor razonable por defecto; en la Fase de Configuración se hará
-   * ajustable sin tocar código.
+   * Vigencia de cada tipo de plan a partir de hoy. El factor de las
+   * tiqueteras (días x factor) es configurable por el administrador.
    */
-  private calcularVigencia(tipoPlan: TipoPlanDto, fechaInicio: Date) {
+  private calcularVigencia(
+    tipoPlan: TipoPlanDto,
+    fechaInicio: Date,
+    factorTiquetera: number,
+  ): { fechaVencimiento: Date; diasTotales: number | null } {
     const desde = fechaInicio.getTime();
+    const en = (dias: number) => new Date(desde + dias * DIA_MS);
+
     switch (tipoPlan) {
       case TipoPlanDto.GIMNASIO_SESION:
-        return { fechaVencimiento: new Date(desde + 1 * DIA_MS), diasTotales: null };
+        return { fechaVencimiento: en(1), diasTotales: null };
       case TipoPlanDto.GIMNASIO_QUINCENA:
-        return { fechaVencimiento: new Date(desde + 15 * DIA_MS), diasTotales: null };
+        return { fechaVencimiento: en(15), diasTotales: null };
       case TipoPlanDto.GIMNASIO_MES:
-        return { fechaVencimiento: new Date(desde + 30 * DIA_MS), diasTotales: null };
-      case TipoPlanDto.TIQUETERA_10:
-        return { fechaVencimiento: new Date(desde + 20 * DIA_MS), diasTotales: 10 };
-      case TipoPlanDto.TIQUETERA_15:
-        return { fechaVencimiento: new Date(desde + 30 * DIA_MS), diasTotales: 15 };
-      case TipoPlanDto.TIQUETERA_20:
-        return { fechaVencimiento: new Date(desde + 40 * DIA_MS), diasTotales: 20 };
-      case TipoPlanDto.TIQUETERA_30:
-        return { fechaVencimiento: new Date(desde + 60 * DIA_MS), diasTotales: 30 };
       case TipoPlanDto.BOXEO:
       case TipoPlanDto.KARATE:
       case TipoPlanDto.MMA:
-        return { fechaVencimiento: new Date(desde + 30 * DIA_MS), diasTotales: null };
+        return { fechaVencimiento: en(30), diasTotales: null };
+      default: {
+        // TIQUETERA_10 / 15 / 20 / 30
+        const dias = Number(String(tipoPlan).split('_')[1]);
+        return {
+          fechaVencimiento: en(Math.round(dias * factorTiquetera)),
+          diasTotales: dias,
+        };
+      }
     }
   }
 
   private tipoIngresoDesde(tipoPlan: TipoPlanDto): string {
     if (tipoPlan.startsWith('TIQUETERA')) return 'TIQUETERA';
-    return tipoPlan; // GIMNASIO_* / BOXEO / KARATE / MMA coinciden 1:1 con TipoIngreso
+    return tipoPlan;
   }
 
   private etiquetaPlan(tipoPlan: TipoPlanDto): string {
@@ -235,20 +233,17 @@ export class PlansService {
     return etiquetas[tipoPlan];
   }
 
-  /**
-   * Recalcula el estado (activo/por vencer/vencido/agotado) a partir de la
-   * fecha de vencimiento y los días usados, y lo persiste si cambió. Esto
-   * mantiene los datos correctos AUN ANTES de que exista el job diario de
-   * la Fase 6 (ver ARQUITECTURA.md 1.5).
-   */
-  private async conEstadoActualizado<T extends {
-    id: string;
-    estado: string;
-    fechaVencimiento: Date;
-    diasTotales: number | null;
-    diasUtilizados: number;
-  }>(plan: T): Promise<T> {
-    const calculado = this.calcularEstado(plan);
+  /** Recalcula y persiste el estado si cambió (ver ARQUITECTURA.md 7.2). */
+  private async conEstadoActualizado<
+    T extends {
+      id: string;
+      estado: string;
+      fechaVencimiento: Date;
+      diasTotales: number | null;
+      diasUtilizados: number;
+    },
+  >(plan: T): Promise<T> {
+    const calculado = calcularEstadoPlan(plan);
     if (calculado !== plan.estado) {
       await this.prisma.plan.update({
         where: { id: plan.id },
@@ -257,21 +252,5 @@ export class PlansService {
       return { ...plan, estado: calculado };
     }
     return plan;
-  }
-
-  private calcularEstado(plan: {
-    fechaVencimiento: Date;
-    diasTotales: number | null;
-    diasUtilizados: number;
-  }): EstadoPlanDto {
-    if (plan.diasTotales != null && plan.diasUtilizados >= plan.diasTotales) {
-      return EstadoPlanDto.AGOTADO;
-    }
-    const diasParaVencer = Math.ceil(
-      (plan.fechaVencimiento.getTime() - Date.now()) / DIA_MS,
-    );
-    if (diasParaVencer < 0) return EstadoPlanDto.VENCIDO;
-    if (diasParaVencer <= 2) return EstadoPlanDto.POR_VENCER;
-    return EstadoPlanDto.ACTIVO;
   }
 }

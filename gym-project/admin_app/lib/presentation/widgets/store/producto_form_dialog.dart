@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_models/shared_models.dart';
 import '../../../providers/store_provider.dart';
+import '../../../providers/settings_provider.dart';
 
 class ProductoFormDialog extends ConsumerStatefulWidget {
   final Producto? producto;
@@ -39,7 +40,8 @@ class _ProductoFormDialogState extends ConsumerState<ProductoFormDialog> {
         TextEditingController(text: p?.precioVenta.toStringAsFixed(0) ?? '');
     _stockCtrl = TextEditingController(text: p?.stock.toString() ?? '0');
     _stockMinimoCtrl =
-        TextEditingController(text: p?.stockMinimo.toString() ?? '5');
+        TextEditingController(text: p?.stockMinimo.toString() ??
+            ref.read(settingsProvider).settings.stockMinimoDefault.toString());
   }
 
   @override

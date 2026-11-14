@@ -203,7 +203,7 @@ src/theme/       # AppTheme, AppColors - mismo sistema visual en ambas apps
 
 Prefijo global: `/api`. Documentación interactiva en `/api/docs`.
 
-**Implementados (Fase 3):**
+**Implementadas (Fase 3):**
 
 | Método | Ruta | Rol requerido | Descripción |
 |---|---|---|---|
@@ -215,11 +215,49 @@ Prefijo global: `/api`. Documentación interactiva en `/api/docs`.
 | PATCH | `/users/:id` | ADMIN, RECEPCION | Editar |
 | DELETE | `/users/:id` | ADMIN | Desactivar (borrado lógico) |
 
-**Planeados por fase** (mismo patrón CRUD + reglas propias):
-- Fase 4: `/plans`, `/plans/:id/usar-tiquetera`, `/accounting/ingresos`,
-  `/accounting/gastos`, `/store/productos`, `/store/ventas`.
-- Fase 5: `/dashboard/admin`, `/dashboard/miembro`.
-- Fase 6: `/notifications`, job interno (no expuesto) que recalcula estados.
+**Implementadas (Fase 4):**
+
+| Método | Ruta | Rol requerido | Descripción |
+|---|---|---|---|
+| POST | `/schedules` | ADMIN | Crear horario de Boxeo/Karate/MMA |
+| GET | `/schedules` | cualquiera autenticado | Listar horarios (filtro por deporte) |
+| PATCH/DELETE | `/schedules/:id` | ADMIN | Editar / desactivar horario |
+| POST | `/plans` | ADMIN, RECEPCION | Registrar plan (crea su Ingreso en la misma transacción) |
+| GET | `/plans` | ADMIN, RECEPCION, ENTRENADOR | Listar (filtro por miembroId/estado) |
+| GET | `/plans/me` | cualquiera autenticado | Planes del usuario logueado (app de miembros) |
+| GET | `/plans/:id` | ADMIN, RECEPCION, ENTRENADOR | Detalle con historial de uso de tiquetera |
+| PATCH | `/plans/:id/usar-tiquetera` | ADMIN, RECEPCION, ENTRENADOR | Descuenta un día de tiquetera |
+| GET | `/accounting/ingresos` \| `/gastos` | ADMIN, CONTADOR | Listado con filtro de fechas |
+| POST | `/accounting/gastos` | ADMIN, CONTADOR | Registrar gasto |
+| GET | `/accounting/resumen` | ADMIN, CONTADOR | Totales + utilidad del rango |
+| POST/GET | `/store/productos` | ADMIN (POST) / +RECEPCION (GET) | CRUD de productos |
+| GET | `/store/productos/stock-bajo` | ADMIN | Productos en o bajo el mínimo |
+| POST | `/store/ventas` | ADMIN, RECEPCION | Venta (descuenta stock + genera Ingreso, todo en una transacción) |
+| GET | `/store/ventas` | ADMIN, CONTADOR | Historial de ventas |
+| GET | `/dashboard/admin` | ADMIN, RECEPCION, ENTRENADOR, CONTADOR | KPIs + alertas de vencimiento en vivo |
+
+**Implementadas (Fase 5):**
+
+| Método | Ruta | Rol requerido | Descripción |
+|---|---|---|---|
+| GET | `/settings` | cualquiera autenticado | Toda la configuración (con valores por defecto) |
+| PUT | `/settings/:clave` | ADMIN | Guarda un ajuste (validado en backend) |
+| PATCH | `/auth/password` | cualquiera autenticado | Cambia la contraseña propia |
+| PATCH | `/users/:id/password` | ADMIN, RECEPCION | Restablece la clave de un miembro (ADMIN: también del personal) |
+| GET | `/users?staff=true` | ADMIN | Lista el personal (roles distintos de MIEMBRO) |
+| GET | `/profile` | cualquiera autenticado | Perfil propio + medidas actuales + preferencias |
+| PATCH | `/profile` | cualquiera autenticado | Edita datos propios (cédula inmutable; fecha de nacimiento una sola vez) |
+| PUT | `/profile/nutrition` · `/profile/training` | cualquiera autenticado | Preferencias de alimentación / perfil de entrenamiento |
+| GET/POST/DELETE | `/progress` | cualquiera autenticado | Historial de peso y estatura propio |
+| GET | `/dashboard/miembro` | cualquiera autenticado | Resumen del miembro (planes con estado real, medidas, recomendaciones) |
+
+Los endpoints de autoservicio (`/profile`, `/progress`, `/dashboard/miembro`,
+`/plans/me`) **nunca reciben un id**: operan siempre sobre el usuario del
+token, así que un miembro no puede ver ni tocar datos de otro.
+
+**Planeadas por fase:**
+- Fase 6: `/notifications`, job diario (`@Cron`, no expuesto por HTTP) que
+  recalcula estados de planes y dispara FCM.
 - Fase 7: `/ai/rutina`, `/ai/alimentacion`, `/ai/chat`.
 
 ---
@@ -237,13 +275,21 @@ Prefijo global: `/api`. Documentación interactiva en `/api/docs`.
 5. La app admin además bloquea el acceso si el rol devuelto es `MIEMBRO`.
 
 ### 7.2 Vencimiento de planes
-1. Job diario (Fase 6, `@Cron`) recorre planes activos y recalcula
-   `estado` según `fechaVencimiento` y, si es tiquetera, días restantes.
-2. Al pasar a "por vencer" (2 días) o "vence mañana" (1 día), se crea un
-   `HistorialNotificacion` y se dispara FCM al miembro.
-3. El Dashboard admin lee siempre el estado ya calculado, coloreado según la
-   regla exacta del proyecto (naranja=2 días, rojo=1 día, gris=vencido
-   reciente).
+1. Al crear un plan (Fase 4), su vigencia se calcula así: Gimnasio-Sesión
+   +1 día, Quincena +15, Mes +30, Boxeo/Karate/MMA +30. Las tiqueteras
+   valen el **doble** de sus días en vigencia máxima (ej. tiquetera de 10
+   días → 20 días calendario para usarlos); es un valor por defecto,
+   ajustable sin tocar código cuando exista el módulo de Configuración.
+2. Mientras no exista el job diario de la Fase 6, `PlansService` y
+   `DashboardService` recalculan el `estado` real a partir de
+   `fechaVencimiento` **en cada lectura** (y lo persisten si cambió), para
+   que nunca se muestre un estado desactualizado. El job de la Fase 6
+   solo añade el disparo proactivo de notificaciones (`HistorialNotificacion`
+   + FCM) cuando el estado cambia, sin el cual igual hay que abrir la app
+   para ver la alerta.
+3. El Dashboard admin colorea las alertas con la regla exacta del proyecto
+   (naranja=2 días, rojo=1 día, gris=vencido reciente), calculada en vivo
+   por `DashboardService.adminResumen()`.
 
 ### 7.3 Pago → Contabilidad
 1. Se registra un `Plan` (o el uso de un cupo de tiquetera).
@@ -287,8 +333,8 @@ Prefijo global: `/api`. Documentación interactiva en `/api/docs`.
 | 1 | Arquitectura general (este documento) | Listo |
 | 2 | Modelo de base de datos completo | Listo |
 | 3 | Backend base: auth + roles + módulo Miembros | Listo |
-| 4 | Planes y Pagos, Tiqueteras, Contabilidad, Tienda (backend + UI) | En curso |
-| 5 | App de miembros completa (plan, perfil, progreso) | Pendiente |
+| 4 | Planes y Pagos, Tiqueteras, Contabilidad, Tienda (backend + UI admin) | Listo |
+| 5 | Configuración (admin) + app de miembros completa: dashboard, línea de plan, perfil, progreso | Listo |
 | 6 | Notificaciones push + job diario de vencimientos | Pendiente |
 | 7 | Integración de IA (rutina, alimentación, chat) | Pendiente |
 | 8 | Gráficos avanzados, pulido visual, pruebas, empaquetado final | Pendiente |
@@ -296,3 +342,60 @@ Prefijo global: `/api`. Documentación interactiva en `/api/docs`.
 Cada módulo nuevo se construirá siguiendo el mismo patrón ya usado en
 `users/` (backend) y en las pantallas ya creadas (Flutter), para que el
 código se sienta como un solo sistema y no como piezas sueltas.
+
+---
+
+## 9. Decisiones de la Fase 5
+
+### 9.1 Catálogos configurables (categorías de gastos y métodos de pago)
+La sección 26 del proyecto pide que el administrador pueda modificarlos.
+Como enums de base de datos eso exigiría una migración por cada categoría
+nueva, así que `metodoPago` y `categoria` pasaron a ser **texto**, y la lista
+válida vive en Configuración (`metodos_pago`, `categorias_gasto`). El backend
+valida cada gasto/venta/plan contra esa lista (`SettingsService.assertMetodoPago`
+/ `assertCategoriaGasto`). Los registros existentes conservan sus valores
+(`'EFECTIVO'`, `'LUZ'`...), y quitar una opción de la lista no altera el
+histórico.
+
+### 9.2 Configuración como clave-valor
+Tabla `configuracion` (ya existía). Claves: `precios_planes`,
+`tiquetera_factor_vigencia`, `categorias_gasto`, `metodos_pago`,
+`stock_minimo_default`, `info_gimnasio`, `notificaciones`. Cada clave tiene
+valor por defecto y validación propia; los campos nuevos que se agreguen en
+el futuro toman su default sin romper lo guardado. Los precios configurados
+son **sugerencias** al registrar un plan: cada plan guarda el precio
+realmente cobrado.
+
+### 9.3 Roles y permisos
+- El menú de la app admin se filtra por rol (`core/permissions.dart`),
+  alineado con los `@Roles()` del backend (que sigue siendo la barrera real).
+- Recepción: miembros, planes y pagos, ventas. Entrenador: consulta de
+  miembros/planes, usar tiquetera y horarios. Contador: contabilidad.
+- Salvaguardas añadidas en `UsersService`: solo un administrador crea o
+  modifica cuentas de personal (evita escalada de privilegios); nadie puede
+  desactivarse a sí mismo; no se puede desactivar ni degradar al último
+  administrador; la cédula es inmutable también vía API.
+- Recepción puede desactivar y restablecer la contraseña de **miembros**
+  (no de personal).
+
+### 9.4 Perfil del miembro
+- El miembro edita contacto y dirección; **no** puede editar cédula, planes,
+  pagos ni datos contables.
+- Fecha de nacimiento ("según reglas administrativas"): el miembro puede
+  registrarla **una sola vez**; para corregirla debe pedirlo al gimnasio.
+- Datos permanentes para la IA: `PreferenciaAlimentacion` (ampliada con
+  alimentos que no le gustan, restricciones y número de comidas) y la nueva
+  `PerfilEntrenamiento` (nivel, lesiones, equipamiento, días y tiempo
+  disponibles). Se piden una vez y se reutilizan en la Fase 7.
+
+### 9.5 Seguimiento de errores de la API
+Un 401 en el login significa "credenciales incorrectas"; en cualquier otra
+llamada significa "sesión vencida". Un 403 muestra "no tienes permiso". La
+contraseña actual incorrecta responde 400 (no 401) para no confundirse con
+una sesión vencida.
+
+### 9.6 Pendiente
+- Fotos de perfil y de productos (requiere decidir dónde se almacenan).
+- Notificaciones: job diario + historial + FCM (Fase 6).
+- IA: rutinas, alimentación y chat (Fase 7).
+- Cierre automático de sesión al vencer el token (hoy se muestra el aviso).

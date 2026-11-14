@@ -4,6 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { SettingsService } from '../settings/settings.service';
 import {
   CreateProductoDto,
   UpdateProductoDto,
@@ -12,15 +13,22 @@ import {
 
 @Injectable()
 export class StoreService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private settings: SettingsService,
+  ) {}
 
   // ---------------------------------------------------------------- //
   // Productos
   // ---------------------------------------------------------------- //
 
-  createProducto(dto: CreateProductoDto) {
+  async createProducto(dto: CreateProductoDto) {
+    // Si no se indica, se usa el stock mínimo predeterminado configurado.
+    const stockMinimo =
+      dto.stockMinimo ??
+      (await this.settings.get<number>('stock_minimo_default'));
     return this.prisma.producto.create({
-      data: { ...dto, stockMinimo: dto.stockMinimo ?? 5 },
+      data: { ...dto, stockMinimo },
     });
   }
 
@@ -75,6 +83,8 @@ export class StoreService {
    * ARQUITECTURA.md 7.4.
    */
   async crearVenta(dto: CreateVentaDto, adminId: string) {
+    await this.settings.assertMetodoPago(dto.metodoPago);
+
     return this.prisma.$transaction(async (tx: any) => {
       let total = 0;
       const detalles: {
@@ -118,7 +128,7 @@ export class StoreService {
       const venta = await tx.venta.create({
         data: {
           total,
-          metodoPago: dto.metodoPago as any,
+          metodoPago: dto.metodoPago,
           usuarioId: adminId,
           detalles: { create: detalles },
         },
@@ -131,7 +141,7 @@ export class StoreService {
           tipo: 'PRODUCTO',
           ventaId: venta.id,
           valor: total,
-          metodoPago: dto.metodoPago as any,
+          metodoPago: dto.metodoPago,
           usuarioAdminId: adminId,
         },
       });

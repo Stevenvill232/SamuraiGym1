@@ -3,31 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_models/shared_models.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../providers/plans_provider.dart';
-
-/// Precios sugeridos por tipo de plan. Son solo un punto de partida editable
-/// por el usuario en el formulario: la Fase de Configuración los hará
-/// ajustables desde la app sin tocar código (ver ARQUITECTURA.md).
-const Map<TipoPlan, double> kPreciosSugeridos = {
-  TipoPlan.gimnasioSesion: 8000,
-  TipoPlan.gimnasioQuincena: 40000,
-  TipoPlan.gimnasioMes: 70000,
-  TipoPlan.tiquetera10: 60000,
-  TipoPlan.tiquetera15: 85000,
-  TipoPlan.tiquetera20: 110000,
-  TipoPlan.tiquetera30: 150000,
-  TipoPlan.boxeo: 80000,
-  TipoPlan.karate: 80000,
-  TipoPlan.mma: 90000,
-};
-
-const _metodosPago = [
-  'EFECTIVO',
-  'TRANSFERENCIA',
-  'NEQUI',
-  'DAVIPLATA',
-  'TARJETA',
-  'OTRO',
-];
+import '../../../providers/settings_provider.dart';
 
 class PlanFormDialog extends ConsumerStatefulWidget {
   /// Si ya se conoce el miembro (ej. viniendo desde su ficha), se preselecciona
@@ -54,7 +30,7 @@ class _PlanFormDialogState extends ConsumerState<PlanFormDialog> {
   String? _miembroId;
   String? _nombreMiembro;
   TipoPlan _tipoPlan = TipoPlan.gimnasioMes;
-  String _metodoPago = 'EFECTIVO';
+  late String _metodoPago;
   String? _horarioId;
   bool _guardando = false;
   String? _error;
@@ -72,7 +48,9 @@ class _PlanFormDialogState extends ConsumerState<PlanFormDialog> {
     super.initState();
     _miembroId = widget.miembroIdInicial;
     _nombreMiembro = widget.nombreMiembroInicial;
-    _precioCtrl.text = kPreciosSugeridos[_tipoPlan]!.toStringAsFixed(0);
+    final cfg = ref.read(settingsProvider).settings;
+    _metodoPago = cfg.metodosPago.first;
+    _precioCtrl.text = cfg.precioDe(_tipoPlan).toStringAsFixed(0);
   }
 
   @override
@@ -109,7 +87,8 @@ class _PlanFormDialogState extends ConsumerState<PlanFormDialog> {
     if (nuevo == null) return;
     setState(() {
       _tipoPlan = nuevo;
-      _precioCtrl.text = kPreciosSugeridos[nuevo]!.toStringAsFixed(0);
+      _precioCtrl.text =
+          ref.read(settingsProvider).settings.precioDe(nuevo).toStringAsFixed(0);
       _horarioId = null;
     });
   }
@@ -210,7 +189,7 @@ class _PlanFormDialogState extends ConsumerState<PlanFormDialog> {
                                 value: _metodoPago,
                                 decoration: const InputDecoration(
                                     labelText: 'Método de pago'),
-                                items: _metodosPago
+                                items: ref.watch(settingsProvider).settings.metodosPago
                                     .map((m) => DropdownMenuItem(
                                         value: m, child: Text(m)))
                                     .toList(),

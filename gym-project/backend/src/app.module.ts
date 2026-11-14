@@ -10,6 +10,9 @@ import { PlansModule } from './plans/plans.module';
 import { AccountingModule } from './accounting/accounting.module';
 import { StoreModule } from './store/store.module';
 import { DashboardModule } from './dashboard/dashboard.module';
+import { SettingsModule } from './settings/settings.module';
+import { ProfileModule } from './profile/profile.module';
+import { ProgressModule } from './progress/progress.module';
 
 @Module({
   imports: [
@@ -28,6 +31,9 @@ import { DashboardModule } from './dashboard/dashboard.module';
     AccountingModule, // ingresos, gastos y resumen financiero
     StoreModule, // productos y ventas (con descuento de stock atómico)
     DashboardModule, // KPIs + alertas de vencimiento del panel admin
+    SettingsModule, // Configuración editable (precios, catálogos, info del gimnasio)
+    ProfileModule, // autoservicio del miembro: perfil + preferencias
+    ProgressModule, // historial de peso y estatura (Mantenimiento)
 
     // ------------------------------------------------------------------
     // Módulos pendientes (mismo patrón que los de arriba):

@@ -1,5 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { calcularEstadoPlan } from '../plans/plan-estado.util';
+import { calcularEdad } from '../common/utils/edad.util';
 
 const DIA_MS = 24 * 60 * 60 * 1000;
 
@@ -81,5 +83,66 @@ export class DashboardService {
       .sort((a: any, b: any) => a.fechaVencimiento.getTime() - b.fechaVencimiento.getTime());
 
     return { miembrosActivos, gananciaDia, gananciaMes, alertas };
+  }
+
+  /**
+   * Resumen para el Dashboard de la app de miembros (sección 12): sus planes
+   * con el estado REAL de hoy, medidas actuales y lo recomendado para hoy.
+   * Se muestran los planes vigentes y los vencidos/agotados de los últimos
+   * 30 días; el historial completo vive en "Línea de Plan".
+   */
+  async miembroResumen(userId: string) {
+    const inicioHoy = new Date();
+    inicioHoy.setHours(0, 0, 0, 0);
+
+    const [user, planes, ultimoFisico, rutina, recomendacion]: any[] =
+      await Promise.all([
+        this.prisma.user.findUnique({ where: { id: userId } }),
+        this.prisma.plan.findMany({
+          where: { miembroId: userId },
+          include: { horario: true },
+          orderBy: { fechaVencimiento: 'desc' },
+        }),
+        this.prisma.historialFisico.findFirst({
+          where: { miembroId: userId },
+          orderBy: { fecha: 'desc' },
+        }),
+        this.prisma.rutinaGenerada.findFirst({
+          where: { miembroId: userId, fecha: { gte: inicioHoy } },
+          orderBy: { fecha: 'desc' },
+        }),
+        this.prisma.recomendacionAlimentaria.findFirst({
+          where: { miembroId: userId, fecha: { gte: inicioHoy } },
+          orderBy: { fecha: 'desc' },
+        }),
+      ]);
+
+    const hace30Dias = Date.now() - 30 * DIA_MS;
+    const planesVisibles = planes
+      .map((p: any) => ({ ...p, estado: calcularEstadoPlan(p) }))
+      .filter(
+        (p: any) =>
+          p.estado === 'ACTIVO' ||
+          p.estado === 'POR_VENCER' ||
+          p.fechaVencimiento.getTime() >= hace30Dias,
+      );
+
+    return {
+      usuario: user
+        ? {
+            id: user.id,
+            nombres: user.nombres,
+            apellidos: user.apellidos,
+            foto: user.foto,
+            edad: calcularEdad(user.fechaNacimiento),
+          }
+        : null,
+      planes: planesVisibles,
+      pesoActual: ultimoFisico?.peso ?? null,
+      estaturaActual: ultimoFisico?.estatura ?? null,
+      ultimoRegistroFisico: ultimoFisico?.fecha ?? null,
+      rutinaDelDia: rutina ?? null,
+      recomendacionDelDia: recomendacion ?? null,
+    };
   }
 }

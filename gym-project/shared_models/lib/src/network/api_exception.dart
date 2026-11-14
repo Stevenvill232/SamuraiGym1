@@ -15,6 +15,14 @@ class ApiException implements Exception {
   factory ApiException.credencialesInvalidas() =>
       const ApiException('Cédula o contraseña incorrecta.', statusCode: 401);
 
+  factory ApiException.sesionExpirada() => const ApiException(
+      'Tu sesión expiró. Cierra sesión y vuelve a ingresar.',
+      statusCode: 401);
+
+  factory ApiException.sinPermiso() => const ApiException(
+      'No tienes permiso para realizar esta acción.',
+      statusCode: 403);
+
   @override
   String toString() => message;
 }

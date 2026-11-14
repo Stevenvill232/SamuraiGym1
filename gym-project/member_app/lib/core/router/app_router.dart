@@ -8,6 +8,10 @@ import '../../presentation/screens/plan_line/plan_line_screen.dart';
 import '../../presentation/screens/ai_chat/ai_chat_screen.dart';
 import '../../presentation/screens/maintenance/maintenance_screen.dart';
 import '../../presentation/screens/profile/profile_screen.dart';
+import '../../presentation/screens/profile/edit_profile_screen.dart';
+import '../../presentation/screens/profile/nutrition_screen.dart';
+import '../../presentation/screens/profile/training_screen.dart';
+import '../../presentation/screens/profile/password_screen.dart';
 import '../../presentation/widgets/nav/member_shell.dart';
 
 class _AuthRefreshNotifier extends ChangeNotifier {
@@ -39,6 +43,24 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/login',
         builder: (context, state) => const LoginScreen(),
+      ),
+      // Pantallas del perfil: van FUERA del shell para abrirse a pantalla
+      // completa (con flecha de regreso) y sin la barra de navegación.
+      GoRoute(
+        path: '/profile/edit',
+        builder: (context, state) => const EditProfileScreen(),
+      ),
+      GoRoute(
+        path: '/profile/nutrition',
+        builder: (context, state) => const NutritionScreen(),
+      ),
+      GoRoute(
+        path: '/profile/training',
+        builder: (context, state) => const TrainingScreen(),
+      ),
+      GoRoute(
+        path: '/profile/password',
+        builder: (context, state) => const PasswordScreen(),
       ),
       ShellRoute(
         builder: (context, state, child) => MemberShell(child: child),

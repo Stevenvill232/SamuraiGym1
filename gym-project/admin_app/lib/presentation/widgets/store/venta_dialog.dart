@@ -3,18 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_models/shared_models.dart';
 import '../../../providers/store_provider.dart';
+import '../../../providers/settings_provider.dart';
 
 final _formatoMoneda =
     NumberFormat.currency(locale: 'es_CO', symbol: '\$', decimalDigits: 0);
-
-const _metodosPago = [
-  'EFECTIVO',
-  'TRANSFERENCIA',
-  'NEQUI',
-  'DAVIPLATA',
-  'TARJETA',
-  'OTRO',
-];
 
 class VentaDialog extends ConsumerStatefulWidget {
   const VentaDialog({super.key});
@@ -25,9 +17,15 @@ class VentaDialog extends ConsumerStatefulWidget {
 
 class _VentaDialogState extends ConsumerState<VentaDialog> {
   final Map<String, int> _cantidades = {};
-  String _metodoPago = 'EFECTIVO';
+  late String _metodoPago;
   bool _guardando = false;
   String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _metodoPago = ref.read(settingsProvider).settings.metodosPago.first;
+  }
 
   void _cambiarCantidad(Producto p, int delta) {
     setState(() {
@@ -148,7 +146,7 @@ class _VentaDialogState extends ConsumerState<VentaDialog> {
                       value: _metodoPago,
                       decoration:
                           const InputDecoration(labelText: 'Método de pago'),
-                      items: _metodosPago
+                      items: ref.watch(settingsProvider).settings.metodosPago
                           .map((m) => DropdownMenuItem(value: m, child: Text(m)))
                           .toList(),
                       onChanged: (v) => setState(() => _metodoPago = v!),

@@ -5,6 +5,7 @@ import 'package:shared_models/shared_models.dart';
 import '../../../providers/members_provider.dart';
 import '../../widgets/members/member_form_dialog.dart';
 import '../../widgets/members/member_list_tile.dart';
+import '../../widgets/members/reset_password_dialog.dart';
 
 class MembersScreen extends ConsumerStatefulWidget {
   const MembersScreen({super.key});
@@ -34,6 +35,18 @@ class _MembersScreenState extends ConsumerState<MembersScreen> {
               ? 'Miembro creado correctamente'
               : 'Miembro actualizado correctamente'),
         ),
+      );
+    }
+  }
+
+  Future<void> _restablecerPassword(Usuario miembro) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (_) => ResetPasswordDialog(usuario: miembro),
+    );
+    if (ok == true && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Contraseña restablecida')),
       );
     }
   }
@@ -149,6 +162,8 @@ class _MembersScreenState extends ConsumerState<MembersScreen> {
                                 onDelete: () => _confirmarEliminar(miembro),
                                 onVerPlanes: () => context
                                     .go('/plans?miembroId=${miembro.id}'),
+                                onResetPassword: () =>
+                                    _restablecerPassword(miembro),
                               );
                             },
                           ),
