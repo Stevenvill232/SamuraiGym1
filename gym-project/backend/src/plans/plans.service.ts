@@ -12,6 +12,8 @@ import {
   TipoPlanDto,
 } from './dto/plan.dto';
 import { DIA_MS, calcularEstadoPlan } from './plan-estado.util';
+import { INCLUDE_HORARIOS, aplanarHorarios } from './plan-horarios.util';
+import { esMiembro, rolesEfectivos } from '../common/utils/roles.util';
 
 const DEPORTES: TipoPlanDto[] = [
   TipoPlanDto.BOXEO,
@@ -37,12 +39,12 @@ export class PlansService {
   async create(dto: CreatePlanDto, adminId: string) {
     const miembro = await this.prisma.user.findUnique({
       where: { id: dto.miembroId },
-      include: { role: true },
+      include: { role: true, rolesAdicionales: true },
     });
     if (!miembro || miembro.estado === 'INACTIVO') {
       throw new NotFoundException('Miembro no encontrado');
     }
-    if (miembro.role.nombre !== 'MIEMBRO') {
+    if (!esMiembro(rolesEfectivos(miembro))) {
       throw new BadRequestException(
         'Solo se pueden registrar planes a miembros del gimnasio',
       );
@@ -51,17 +53,31 @@ export class PlansService {
     await this.settings.assertMetodoPago(dto.metodoPago);
 
     const esDeporte = DEPORTES.includes(dto.tipoPlan);
-    if (esDeporte && !dto.horarioId) {
+    const horarioIds = Array.from(new Set(dto.horarioIds ?? []));
+    if (esDeporte && horarioIds.length === 0) {
       throw new BadRequestException(
-        'Selecciona un horario para Boxeo, Karate o MMA',
+        'Selecciona al menos un horario (día y hora) para Boxeo, Karate o MMA',
       );
     }
-    if (dto.horarioId) {
-      const horario = await this.prisma.horario.findUnique({
-        where: { id: dto.horarioId },
+    if (!esDeporte && horarioIds.length > 0) {
+      throw new BadRequestException(
+        'Solo los planes de Boxeo, Karate y MMA llevan horarios',
+      );
+    }
+    if (horarioIds.length > 0) {
+      const horarios: any[] = await this.prisma.horario.findMany({
+        where: { id: { in: horarioIds }, estado: true },
       });
-      if (!horario || !horario.estado) {
-        throw new NotFoundException('Horario no encontrado o inactivo');
+      if (horarios.length !== horarioIds.length) {
+        throw new NotFoundException(
+          'Alguno de los horarios no existe o está inactivo',
+        );
+      }
+      // Un plan de Boxeo solo puede usar horarios de Boxeo, etc.
+      if (horarios.some((h: any) => h.deporte !== dto.tipoPlan)) {
+        throw new BadRequestException(
+          `Los horarios deben ser de ${this.etiquetaPlan(dto.tipoPlan)}`,
+        );
       }
     }
 
@@ -83,7 +99,9 @@ export class PlansService {
           fechaVencimiento,
           diasTotales,
           metodoPago: dto.metodoPago,
-          horarioId: dto.horarioId,
+          horarios: {
+            create: horarioIds.map((horarioId) => ({ horarioId })),
+          },
           observaciones: dto.observaciones,
         },
       });
@@ -115,7 +133,7 @@ export class PlansService {
       },
       include: {
         miembro: { select: MIEMBRO_SELECT },
-        horario: true,
+        ...INCLUDE_HORARIOS,
         ...(incluirUsos
           ? { usosTiquetera: { orderBy: { fechaUso: 'asc' } } }
           : {}),
@@ -123,7 +141,11 @@ export class PlansService {
       orderBy: { fechaCompra: 'desc' },
     });
 
-    return Promise.all(planes.map((p: any) => this.conEstadoActualizado(p)));
+    return Promise.all(
+      planes.map(async (p: any) =>
+        aplanarHorarios(await this.conEstadoActualizado(p)),
+      ),
+    );
   }
 
   async findOne(id: string) {
@@ -131,12 +153,12 @@ export class PlansService {
       where: { id },
       include: {
         miembro: { select: MIEMBRO_SELECT },
-        horario: true,
+        ...INCLUDE_HORARIOS,
         usosTiquetera: { orderBy: { fechaUso: 'desc' } },
       },
     });
     if (!plan) throw new NotFoundException('Plan no encontrado');
-    return this.conEstadoActualizado(plan);
+    return aplanarHorarios(await this.conEstadoActualizado(plan));
   }
 
   /** Planes del propio miembro, con el historial de días de tiquetera. */

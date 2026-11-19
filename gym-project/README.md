@@ -105,6 +105,20 @@ tiquetera, usa "Usar día" desde la app admin y míralo aparecer en el
 historial) → Progreso (registra 2 o 3 pesos para ver el gráfico) → Perfil
 (completa tus preferencias y cambia tu contraseña).
 
+### Probar la Fase 5.1
+
+- **Contabilidad:** registra un plan y entra a Contabilidad: el ingreso del
+  mes debe aparecer (y el botón de actualizar lo refresca sin salir).
+- **Horarios:** Configuración → Horarios → "Nuevo horario": agrega Lunes,
+  Miércoles y Viernes con su hora en un solo paso. Luego registra un plan de
+  Boxeo y marca los días en que entrenará.
+- **Persona con dos roles:** crea un miembro y luego, en Configuración →
+  Personal, "Nuevo personal" con **la misma cédula**: se le suma el rol y
+  conserva su contraseña.
+- **Recuperar contraseña:** en la pantalla de ingreso del admin, "¿Olvidaste
+  tu contraseña?". Antes registra tu correo en Configuración → Mi cuenta.
+  Sin SMTP configurado, el código aparece en la consola del backend.
+
 ## 5. Notificaciones push (Firebase) — cuando llegues a esa fase
 
 1. Crea un proyecto en Firebase Console.

@@ -24,7 +24,19 @@ class DashboardScreen extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Dashboard', style: Theme.of(context).textTheme.headlineMedium),
+            Row(
+              children: [
+                Expanded(
+                  child: Text('Dashboard',
+                      style: Theme.of(context).textTheme.headlineMedium),
+                ),
+                IconButton(
+                  tooltip: 'Actualizar',
+                  icon: const Icon(Icons.refresh_rounded),
+                  onPressed: () => ref.invalidate(dashboardProvider),
+                ),
+              ],
+            ),
             const SizedBox(height: 4),
             Text(
               'Resumen del gimnasio en tiempo real',

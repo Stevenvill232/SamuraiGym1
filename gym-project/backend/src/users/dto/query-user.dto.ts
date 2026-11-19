@@ -19,3 +19,13 @@ export class QueryUserDto {
   @IsIn(['true', 'false'])
   staff?: string;
 }
+
+export class DesactivarQueryDto {
+  @ApiPropertyOptional({
+    description:
+      'personal = quitar solo el acceso de personal; miembro = quitar solo la condición de miembro. Sin valor = desactivar la cuenta completa.',
+  })
+  @IsOptional()
+  @IsIn(['personal', 'miembro'])
+  como?: string;
+}

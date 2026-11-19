@@ -149,6 +149,6 @@ class AccountingNotifier extends StateNotifier<AccountingState> {
 }
 
 final accountingProvider =
-    StateNotifierProvider<AccountingNotifier, AccountingState>((ref) {
+    StateNotifierProvider.autoDispose<AccountingNotifier, AccountingState>((ref) {
   return AccountingNotifier(ref.watch(apiClientProvider));
 });

@@ -5,6 +5,11 @@ import '../../../providers/settings_provider.dart';
 import 'settings_common.dart';
 
 /// Categorías de gastos, métodos de pago y stock mínimo predeterminado.
+///
+/// Las listas se guardan AL INSTANTE: cada vez que agregas o quitas un
+/// elemento se envía al servidor, y si falla se deshace y se muestra el error.
+/// (Antes dependían de un botón "Guardar" al final de la página y, si no se
+/// pulsaba, los cambios se perdían al cambiar de pestaña.)
 class CatalogosTab extends ConsumerStatefulWidget {
   final AppSettings settings;
   const CatalogosTab({super.key, required this.settings});
@@ -17,8 +22,8 @@ class _CatalogosTabState extends ConsumerState<CatalogosTab> {
   late List<String> _categorias;
   late List<String> _metodos;
   late final TextEditingController _stockCtrl;
-  bool _guardando = false;
-  String? _error;
+  bool _guardandoStock = false;
+  String? _errorStock;
 
   @override
   void initState() {
@@ -35,35 +40,58 @@ class _CatalogosTabState extends ConsumerState<CatalogosTab> {
     super.dispose();
   }
 
-  Future<void> _guardar() async {
-    final stock = int.tryParse(_stockCtrl.text.trim());
-    if (_categorias.isEmpty || _metodos.isEmpty) {
-      setState(() => _error =
-          'Debe haber al menos una categoría y un método de pago');
+  void _aviso(String texto) {
+    final m = ScaffoldMessenger.of(context);
+    m.hideCurrentSnackBar();
+    m.showSnackBar(SnackBar(
+      content: Text(texto),
+      duration: const Duration(seconds: 3),
+    ));
+  }
+
+  /// Aplica el cambio en pantalla de inmediato, lo guarda, y lo deshace si
+  /// el servidor lo rechaza.
+  Future<void> _cambiarLista(
+    String clave,
+    List<String> nueva,
+    List<String> anterior,
+    void Function(List<String>) asignar,
+  ) async {
+    if (nueva.isEmpty) {
+      _aviso('Debe quedar al menos un elemento en la lista');
       return;
     }
+    setState(() => asignar(nueva));
+    final error =
+        await ref.read(settingsProvider.notifier).guardarVarias({clave: nueva});
+    if (!mounted) return;
+    if (error != null) {
+      setState(() => asignar(anterior));
+      _aviso('No se pudo guardar: $error');
+    } else {
+      _aviso('Cambios guardados');
+    }
+  }
+
+  Future<void> _guardarStock() async {
+    final stock = int.tryParse(_stockCtrl.text.trim());
     if (stock == null || stock < 0) {
-      setState(() => _error = 'El stock mínimo debe ser un número entero');
+      setState(() => _errorStock = 'El stock mínimo debe ser un número entero');
       return;
     }
     setState(() {
-      _guardando = true;
-      _error = null;
+      _guardandoStock = true;
+      _errorStock = null;
     });
-    final error = await ref.read(settingsProvider.notifier).guardarVarias({
-      'categorias_gasto': _categorias,
-      'metodos_pago': _metodos,
-      'stock_minimo_default': stock,
-    });
+    final error = await ref
+        .read(settingsProvider.notifier)
+        .guardarVarias({'stock_minimo_default': stock});
     if (!mounted) return;
     setState(() {
-      _guardando = false;
-      _error = error;
+      _guardandoStock = false;
+      _errorStock = error;
     });
-    if (error == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Catálogos guardados')));
-    }
+    if (error == null) _aviso('Stock mínimo guardado');
   }
 
   @override
@@ -73,22 +101,24 @@ class _CatalogosTabState extends ConsumerState<CatalogosTab> {
         SeccionCard(
           titulo: 'Categorías de gastos',
           descripcion:
-              'Quitar o renombrar una categoría no modifica los gastos ya registrados.',
+              'Se guardan al instante. Quitar o renombrar una categoría no modifica los gastos ya registrados.',
           child: TagsEditor(
             label: 'Categorías',
             values: _categorias,
-            onChanged: (v) => setState(() => _categorias = v),
+            onChanged: (v) => _cambiarLista(
+                'categorias_gasto', v, _categorias, (l) => _categorias = l),
             hint: 'Ej. Publicidad',
           ),
         ),
         SeccionCard(
           titulo: 'Métodos de pago',
           descripcion:
-              'Aparecen al registrar planes, ventas y gastos. Los pagos anteriores conservan el método con el que se hicieron.',
+              'Se guardan al instante. Aparecen al registrar planes, ventas y gastos; los pagos anteriores conservan el método con el que se hicieron.',
           child: TagsEditor(
             label: 'Métodos de pago',
             values: _metodos,
-            onChanged: (v) => setState(() => _metodos = v),
+            onChanged: (v) =>
+                _cambiarLista('metodos_pago', v, _metodos, (l) => _metodos = l),
             hint: 'Ej. Bancolombia',
           ),
         ),
@@ -96,18 +126,28 @@ class _CatalogosTabState extends ConsumerState<CatalogosTab> {
           titulo: 'Inventario',
           descripcion:
               'Stock mínimo que se propone al crear un producto nuevo. Cada producto puede tener el suyo.',
-          child: SizedBox(
-            width: 200,
-            child: TextField(
-              controller: _stockCtrl,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(
-                  labelText: 'Stock mínimo predeterminado', isDense: true),
-            ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SizedBox(
+                width: 240,
+                child: TextField(
+                  controller: _stockCtrl,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                      labelText: 'Stock mínimo predeterminado', isDense: true),
+                ),
+              ),
+              const SizedBox(height: 14),
+              BotonGuardar(
+                guardando: _guardandoStock,
+                error: _errorStock,
+                onPressed: _guardarStock,
+                texto: 'Guardar stock mínimo',
+              ),
+            ],
           ),
         ),
-        BotonGuardar(
-            guardando: _guardando, error: _error, onPressed: _guardar),
       ],
     );
   }

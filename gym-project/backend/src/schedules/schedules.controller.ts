@@ -13,6 +13,7 @@ import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { SchedulesService } from './schedules.service';
 import {
   CreateHorarioDto,
+  CreateHorariosBulkDto,
   UpdateHorarioDto,
   QueryHorarioDto,
 } from './dto/horario.dto';
@@ -31,6 +32,13 @@ export class SchedulesController {
   @Post()
   create(@Body() dto: CreateHorarioDto) {
     return this.service.create(dto);
+  }
+
+  // Varios días/horas de un deporte en un solo paso.
+  @Roles('ADMINISTRADOR', 'ENTRENADOR')
+  @Post('bulk')
+  createBulk(@Body() dto: CreateHorariosBulkDto) {
+    return this.service.createBulk(dto);
   }
 
   // Sin @Roles(): cualquier usuario autenticado puede consultar horarios

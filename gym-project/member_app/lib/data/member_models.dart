@@ -54,14 +54,25 @@ class HorarioInfo {
 /// compartido, su horario (deportes) y los días de tiquetera ya usados.
 class PlanDetalle {
   final Plan plan;
-  final HorarioInfo? horario;
+  final List<HorarioInfo> horarios; // un plan de deporte puede tener varios
   final List<DateTime> usos; // del más antiguo al más reciente
 
-  const PlanDetalle({required this.plan, this.horario, this.usos = const []});
+  const PlanDetalle(
+      {required this.plan, this.horarios = const [], this.usos = const []});
 
   factory PlanDetalle.fromJson(Map<String, dynamic> j) {
-    final h = j['horario'];
     final u = j['usosTiquetera'];
+    final hs = j['horarios'];
+    final horarios = <HorarioInfo>[
+      if (hs is List)
+        for (final h in hs)
+          if (h is Map) HorarioInfo.fromJson(Map<String, dynamic>.from(h)),
+    ];
+    // Planes anteriores con un único horario.
+    if (horarios.isEmpty && j['horario'] is Map) {
+      horarios.add(HorarioInfo.fromJson(
+          Map<String, dynamic>.from(j['horario'] as Map)));
+    }
     final usos = <DateTime>[];
     if (u is List) {
       for (final item in u) {
@@ -72,9 +83,7 @@ class PlanDetalle {
     }
     return PlanDetalle(
       plan: Plan.fromJson(j),
-      horario: h is Map
-          ? HorarioInfo.fromJson(Map<String, dynamic>.from(h))
-          : null,
+      horarios: horarios,
       usos: usos,
     );
   }

@@ -1,40 +1,22 @@
 import { ApiPropertyOptional, ApiProperty } from '@nestjs/swagger';
 import {
   IsDateString,
-  IsEnum,
+  IsNotEmpty,
   IsNumber,
   IsOptional,
   IsPositive,
   IsString,
 } from 'class-validator';
 
-export enum CategoriaGastoDto {
-  LUZ = 'LUZ',
-  AGUA = 'AGUA',
-  NOMINA = 'NOMINA',
-  ARRIENDO = 'ARRIENDO',
-  INTERNET = 'INTERNET',
-  MANTENIMIENTO = 'MANTENIMIENTO',
-  IMPLEMENTOS = 'IMPLEMENTOS',
-  OTRO = 'OTRO',
-}
-
-export enum MetodoPagoDto {
-  EFECTIVO = 'EFECTIVO',
-  TRANSFERENCIA = 'TRANSFERENCIA',
-  NEQUI = 'NEQUI',
-  DAVIPLATA = 'DAVIPLATA',
-  TARJETA = 'TARJETA',
-  OTRO = 'OTRO',
-}
-
 export class CreateGastoDto {
-  @ApiProperty({ enum: CategoriaGastoDto })
-  @IsEnum(CategoriaGastoDto)
-  categoria: CategoriaGastoDto;
+  @ApiProperty({ example: 'LUZ', description: 'Debe existir en Configuración > Categorías de gastos' })
+  @IsString()
+  @IsNotEmpty()
+  categoria: string;
 
   @ApiProperty({ example: 'Factura de energía - septiembre' })
   @IsString()
+  @IsNotEmpty()
   descripcion: string;
 
   @ApiProperty({ example: 150000 })
@@ -42,9 +24,10 @@ export class CreateGastoDto {
   @IsPositive()
   valor: number;
 
-  @ApiProperty({ enum: MetodoPagoDto })
-  @IsEnum(MetodoPagoDto)
-  metodoPago: MetodoPagoDto;
+  @ApiProperty({ example: 'EFECTIVO', description: 'Debe existir en Configuración > Métodos de pago' })
+  @IsString()
+  @IsNotEmpty()
+  metodoPago: string;
 
   @ApiPropertyOptional()
   @IsOptional()

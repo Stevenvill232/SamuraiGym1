@@ -5,17 +5,41 @@ import 'auth_provider.dart';
 /// Extiende el [Plan] de shared_models con los datos del miembro que trae
 /// incluido el backend (el modelo compartido no los tiene porque la app de
 /// miembros no los necesita: un miembro ya sabe quién es).
+String _etiquetaDiaCorta(String d) => switch (d) {
+      'LUNES' => 'Lun',
+      'MARTES' => 'Mar',
+      'MIERCOLES' => 'Mié',
+      'JUEVES' => 'Jue',
+      'VIERNES' => 'Vie',
+      'SABADO' => 'Sáb',
+      'DOMINGO' => 'Dom',
+      _ => d,
+    };
+
+/// ["Lun 17:00-18:00", "Mié 17:00-18:00"] a partir de la lista `horarios`
+/// que entrega el backend (ya ordenada por día y hora).
+List<String> _horariosDe(dynamic v) {
+  if (v is! List) return const [];
+  return [
+    for (final h in v)
+      if (h is Map)
+        '${_etiquetaDiaCorta(h['dia'].toString())} ${h['horaInicio']}-${h['horaFin']}',
+  ];
+}
+
 class PlanConMiembro {
   final Plan plan;
   final String nombreMiembro;
   final String cedulaMiembro;
   final String? fotoMiembro;
+  final List<String> horarios;
 
   const PlanConMiembro({
     required this.plan,
     required this.nombreMiembro,
     required this.cedulaMiembro,
     this.fotoMiembro,
+    this.horarios = const [],
   });
 
   factory PlanConMiembro.fromJson(Map<String, dynamic> json) {
@@ -27,6 +51,7 @@ class PlanConMiembro {
           : 'Miembro',
       cedulaMiembro: miembro?['cedula'] as String? ?? '',
       fotoMiembro: miembro?['foto'] as String?,
+      horarios: _horariosDe(json['horarios']),
     );
   }
 }
@@ -84,7 +109,7 @@ class PlansNotifier extends StateNotifier<PlansState> {
     required TipoPlan tipoPlan,
     required double precio,
     required String metodoPago,
-    String? horarioId,
+    List<String>? horarioIds,
     String? observaciones,
   }) async {
     try {
@@ -93,7 +118,8 @@ class PlansNotifier extends StateNotifier<PlansState> {
         'tipoPlan': tipoPlan.toApi(),
         'precio': precio,
         'metodoPago': metodoPago,
-        if (horarioId != null) 'horarioId': horarioId,
+        if (horarioIds != null && horarioIds.isNotEmpty)
+          'horarioIds': horarioIds,
         if (observaciones != null && observaciones.isNotEmpty)
           'observaciones': observaciones,
       });

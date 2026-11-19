@@ -48,8 +48,22 @@ class AccountingScreen extends ConsumerWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Contabilidad',
-                          style: Theme.of(context).textTheme.headlineMedium),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text('Contabilidad',
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .headlineMedium),
+                          ),
+                          IconButton(
+                            tooltip: 'Actualizar',
+                            icon: const Icon(Icons.refresh_rounded),
+                            onPressed: () =>
+                                ref.read(accountingProvider.notifier).cargar(),
+                          ),
+                        ],
+                      ),
                       const SizedBox(height: 4),
                       Text(
                         'Ingresos y gastos del mes en curso',

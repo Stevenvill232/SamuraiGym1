@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_models/shared_models.dart';
 import '../../../providers/auth_provider.dart';
+import '../../widgets/auth/recuperar_password_dialog.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -30,6 +31,22 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         .login(_cedulaCtrl.text.trim(), _passwordCtrl.text);
   }
 
+  Future<void> _recuperar() async {
+    final cambiada = await showDialog<bool>(
+      context: context,
+      builder: (_) =>
+          RecuperarPasswordDialog(cedulaInicial: _cedulaCtrl.text.trim()),
+    );
+    if (cambiada == true && mounted) {
+      _passwordCtrl.clear();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Contraseña actualizada. Ya puedes iniciar sesión.'),
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final auth = ref.watch(authProvider);
@@ -55,8 +72,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             color: AppColors.ember, size: 32),
                         const SizedBox(width: 12),
                         Text('Gym Admin',
-                            style:
-                                Theme.of(context).textTheme.headlineSmall),
+                            style: Theme.of(context).textTheme.headlineSmall),
                       ],
                     ),
                     const SizedBox(height: 4),
@@ -71,12 +87,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     TextFormField(
                       controller: _cedulaCtrl,
                       keyboardType: TextInputType.number,
-                      decoration:
-                          const InputDecoration(labelText: 'Cédula'),
-                      validator: (v) =>
-                          (v == null || v.trim().isEmpty)
-                              ? 'Ingresa tu cédula'
-                              : null,
+                      decoration: const InputDecoration(labelText: 'Cédula'),
+                      validator: (v) => (v == null || v.trim().isEmpty)
+                          ? 'Ingresa tu cédula'
+                          : null,
                     ),
                     const SizedBox(height: 16),
                     TextFormField(
@@ -97,14 +111,21 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           ? 'Mínimo 6 caracteres'
                           : null,
                     ),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: TextButton(
+                        onPressed: auth.cargando ? null : _recuperar,
+                        child: const Text('¿Olvidaste tu contraseña?'),
+                      ),
+                    ),
                     if (auth.error != null) ...[
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 4),
                       Text(
                         auth.error!,
                         style: const TextStyle(color: AppColors.estadoVencido),
                       ),
                     ],
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 16),
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton(

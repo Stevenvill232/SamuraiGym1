@@ -1,5 +1,17 @@
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
-import { IsEnum, IsInt, IsOptional, IsString, Matches, Min } from 'class-validator';
+import { Type } from 'class-transformer';
+import {
+  ArrayMaxSize,
+  ArrayMinSize,
+  IsArray,
+  IsEnum,
+  IsInt,
+  IsOptional,
+  IsString,
+  Matches,
+  Min,
+  ValidateNested,
+} from 'class-validator';
 
 export enum DeporteDto {
   BOXEO = 'BOXEO',
@@ -55,4 +67,43 @@ export class QueryHorarioDto {
   @IsOptional()
   @IsString()
   dia?: string;
+}
+
+/** Un día y una franja horaria. */
+export class FranjaDto {
+  @ApiProperty({ enum: DiaSemanaDto })
+  @IsEnum(DiaSemanaDto)
+  dia: DiaSemanaDto;
+
+  @ApiProperty({ example: '17:00' })
+  @Matches(HORA_REGEX, { message: 'horaInicio debe tener formato HH:mm' })
+  horaInicio: string;
+
+  @ApiProperty({ example: '18:00' })
+  @Matches(HORA_REGEX, { message: 'horaFin debe tener formato HH:mm' })
+  horaFin: string;
+}
+
+/**
+ * Crea varios horarios de un mismo deporte en un solo paso, cada uno con su
+ * propio día y hora (ej. Lunes 17-18, Miércoles 17-18, Viernes 18-19).
+ */
+export class CreateHorariosBulkDto {
+  @ApiProperty({ enum: DeporteDto })
+  @IsEnum(DeporteDto)
+  deporte: DeporteDto;
+
+  @ApiProperty({ type: [FranjaDto] })
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(14)
+  @ValidateNested({ each: true })
+  @Type(() => FranjaDto)
+  franjas: FranjaDto[];
+
+  @ApiPropertyOptional({ example: 20, description: 'Cupo aplicado a todos' })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  cupo?: number;
 }

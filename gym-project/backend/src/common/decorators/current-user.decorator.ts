@@ -3,7 +3,8 @@ import { createParamDecorator, ExecutionContext } from '@nestjs/common';
 export interface AuthenticatedUser {
   userId: string;
   cedula: string;
-  role: string;
+  role: string; // rol principal
+  roles: string[]; // todos sus roles (principal + adicionales)
 }
 
 /**

@@ -255,6 +255,19 @@ Los endpoints de autoservicio (`/profile`, `/progress`, `/dashboard/miembro`,
 `/plans/me`) **nunca reciben un id**: operan siempre sobre el usuario del
 token, así que un miembro no puede ver ni tocar datos de otro.
 
+**Implementadas (Fase 5.1 — correcciones y mejoras):**
+
+| Método | Ruta | Rol requerido | Descripción |
+|---|---|---|---|
+| POST | `/auth/password-reset/request` | público | Envía un código de 6 dígitos al correo del personal |
+| POST | `/auth/password-reset/confirm` | público | Valida el código y fija la nueva contraseña |
+| POST | `/schedules/bulk` | ADMIN, ENTRENADOR | Crea varios días/horas de un deporte en un solo paso |
+| PUT | `/users/:id/staff-roles` | ADMIN | Define los roles de personal de una persona |
+| DELETE | `/users/:id?como=miembro\|personal` | ADMIN, RECEPCION | Quita solo una condición (miembro o personal) |
+
+`POST /plans` ahora recibe `horarioIds` (lista) en lugar de un único
+`horarioId`.
+
 **Planeadas por fase:**
 - Fase 6: `/notifications`, job diario (`@Cron`, no expuesto por HTTP) que
   recalcula estados de planes y dispara FCM.
@@ -399,3 +412,55 @@ una sesión vencida.
 - Notificaciones: job diario + historial + FCM (Fase 6).
 - IA: rutinas, alimentación y chat (Fase 7).
 - Cierre automático de sesión al vencer el token (hoy se muestra el aviso).
+
+---
+
+## 10. Decisiones de la Fase 5.1
+
+### 10.1 Una persona, varios roles
+Quien es recepcionista y además paga clases de boxeo es **una sola persona**
+(una cédula, una cuenta, una contraseña) con dos roles. Modelo: `User.role`
+es el rol **principal** y `User.rolesAdicionales` (relación muchos a muchos)
+guarda el resto. Invariante: si la persona tiene algún rol de personal, el
+principal es de personal y `MIEMBRO` va como adicional (así la app
+administrativa la reconoce). El JWT lleva `role` (principal) y `roles` (todos);
+`RolesGuard` permite el acceso si tiene **alguno** de los roles requeridos.
+- Crear personal o miembro con una cédula que ya existe **suma el rol** a la
+  cuenta existente (conserva nombre y contraseña) en vez de rechazar; si la
+  cuenta estaba desactivada, se **reactiva** con los datos nuevos.
+- Dar roles de personal sigue siendo exclusivo del administrador; sumar el
+  rol de miembro lo puede hacer también Recepción (no otorga poder alguno).
+- "Quitar" es parcial: quitar la condición de miembro o el acceso de personal
+  no desactiva la cuenta si la persona conserva la otra condición.
+- Los roles viajan en el token: un cambio de roles se refleja cuando la
+  persona vuelve a iniciar sesión.
+
+### 10.2 Varios horarios por plan (Boxeo, Karate, MMA)
+Un miembro entrena 1, 2 o 3 días a la semana, cada uno en su horario. La
+relación Plan–Horario pasó a muchos a muchos (`PlanHorario`). El backend
+valida que haya al menos un horario, que existan y estén activos, y que sean
+del mismo deporte del plan. `Plan.horarioId` queda solo por compatibilidad
+con planes anteriores (se muestra si el plan no tiene horarios nuevos). En
+Configuración los horarios se crean **por lote** (varios días, cada uno con
+su hora).
+
+### 10.3 Recuperación de contraseña del personal por correo
+Flujo: cédula → código de 6 dígitos al correo registrado → código + nueva
+contraseña. Seguridad: respuesta idéntica exista o no la cuenta (no revela
+qué cédulas están registradas); el código se guarda solo como hash, vence en
+15 minutos, sirve una vez y se bloquea tras 5 intentos; máximo 1 envío por
+minuto y 5 por hora; aplica solo a cuentas con rol de personal. Sin SMTP
+configurado, en desarrollo el código se imprime en la consola del backend.
+Extensible a miembros cuando la app móvil tenga la pantalla.
+
+### 10.4 Datos frescos en pantallas
+Contabilidad, Miembros y Tienda cargaban una sola vez y conservaban el
+resultado mientras la app estuviera abierta (por eso los ingresos nuevos no
+aparecían). Ahora sus providers son `autoDispose`: se recargan cada vez que
+se entra a la pantalla; Contabilidad y Dashboard tienen además botón
+"Actualizar".
+
+### 10.5 Idioma y diagnóstico
+- Calendarios y selector de hora en español (`flutter_localizations`).
+- Los errores 5xx muestran en modo debug qué petición falló, y el backend
+  registra método y ruta de cada error, para ubicar rápido cualquier falla.

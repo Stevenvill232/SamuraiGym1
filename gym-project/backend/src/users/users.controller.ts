@@ -6,6 +6,7 @@ import {
   Param,
   Patch,
   Post,
+  Put,
   Query,
   UseGuards,
 } from '@nestjs/common';
@@ -13,8 +14,9 @@ import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
-import { QueryUserDto } from './dto/query-user.dto';
+import { DesactivarQueryDto, QueryUserDto } from './dto/query-user.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
+import { StaffRolesDto } from './dto/staff-roles.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
@@ -58,6 +60,17 @@ export class UsersController {
     return this.usersService.update(id, dto, user);
   }
 
+  // Roles de personal de una persona (conserva su condición de miembro).
+  @Roles('ADMINISTRADOR')
+  @Put(':id/staff-roles')
+  setStaffRoles(
+    @Param('id') id: string,
+    @Body() dto: StaffRolesDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.usersService.setStaffRoles(id, dto.roles, user);
+  }
+
   @Roles('ADMINISTRADOR', 'RECEPCION')
   @Patch(':id/password')
   resetPassword(
@@ -68,9 +81,14 @@ export class UsersController {
     return this.usersService.resetPassword(id, dto.password, user);
   }
 
+  // DELETE /users/:id?como=miembro|personal  (sin `como`: cuenta completa)
   @Roles('ADMINISTRADOR', 'RECEPCION')
   @Delete(':id')
-  remove(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
-    return this.usersService.remove(id, user);
+  remove(
+    @Param('id') id: string,
+    @Query() query: DesactivarQueryDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.usersService.remove(id, user, query.como);
   }
 }

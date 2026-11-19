@@ -33,8 +33,8 @@ class SettingsScreen extends ConsumerWidget {
         child: Text('No se pudo verificar tu rol. Cierra sesión e ingresa de nuevo.'),
       ),
       data: (m) {
-        final rol = m?.role;
-        final esAdmin = rol == UserRole.administrador;
+        final roles = m?.roles ?? <UserRole>{};
+        final esAdmin = roles.contains(UserRole.administrador);
         final tabs = <_ConfigTab>[
           if (esAdmin)
             _ConfigTab('Precios',
@@ -42,7 +42,7 @@ class SettingsScreen extends ConsumerWidget {
           if (esAdmin)
             _ConfigTab('Catálogos',
                 SettingsGate(builder: (s) => CatalogosTab(settings: s))),
-          if (esAdmin || rol == UserRole.entrenador)
+          if (esAdmin || roles.contains(UserRole.entrenador))
             const _ConfigTab('Horarios', HorariosTab()),
           if (esAdmin) const _ConfigTab('Personal', PersonalTab()),
           if (esAdmin)

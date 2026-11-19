@@ -34,7 +34,8 @@ model Role {
   nombre    String       @unique // ADMINISTRADOR, MIEMBRO, RECEPCION, ENTRENADOR, CONTADOR
   createdAt DateTime     @default(now())
 
-  usuarios  User[]
+  usuarios  User[]       @relation("RolPrincipal")
+  usuariosAdicionales User[] @relation("RolesAdicionales")
   permisos  Permission[] @relation("RolePermisos")
 
   @@map("roles")
@@ -79,7 +80,11 @@ model User {
   updatedAt       DateTime      @updatedAt
 
   roleId          String
-  role            Role          @relation(fields: [roleId], references: [id])
+  role            Role          @relation("RolPrincipal", fields: [roleId], references: [id])
+  // Roles ADICIONALES de la misma persona (ej. recepcionista que también es
+  // miembro). Invariante: si la persona tiene algún rol de personal, el rol
+  // principal (`role`) es de personal y MIEMBRO va aquí.
+  rolesAdicionales Role[]      @relation("RolesAdicionales")
 
   // Relaciones como MIEMBRO
   planes                  Plan[]                     @relation("PlanesDelMiembro")
@@ -89,6 +94,7 @@ model User {
   rutinasGeneradas        RutinaGenerada[]
   recomendaciones         RecomendacionAlimentaria[]
   notificaciones          HistorialNotificacion[]
+  passwordResets          PasswordResetToken[]
   ingresosComoMiembro     Ingreso[]                  @relation("IngresoDelMiembro")
 
   // Relaciones como STAFF/ADMIN (quién registró qué)
@@ -137,8 +143,9 @@ model Plan {
   diasUtilizados   Int        @default(0) // solo tiqueteras
   estado           EstadoPlan @default(ACTIVO)
   metodoPago       String
-  horarioId        String?
+  horarioId        String? // OBSOLETO: usar `horarios`
   horario          Horario?   @relation(fields: [horarioId], references: [id])
+  horarios         PlanHorario[] // reemplaza a horarioId (se conserva solo por compatibilidad)
   observaciones    String?
   createdAt        DateTime   @default(now())
   updatedAt        DateTime   @updatedAt
@@ -191,6 +198,7 @@ model Horario {
   estado     Boolean   @default(true)
 
   planes Plan[]
+  planHorarios PlanHorario[]
 
   @@index([deporte])
   @@map("horarios")
@@ -411,4 +419,39 @@ model Configuracion {
   updatedAt DateTime @updatedAt
 
   @@map("configuracion")
+}
+
+// ----------------------------------------------------------------------------
+// Horarios de un plan de Boxeo/Karate/MMA (relación muchos a muchos): un
+// miembro puede entrenar 1, 2 o 3 días a la semana, cada uno en su horario.
+// ----------------------------------------------------------------------------
+
+model PlanHorario {
+  planId    String
+  plan      Plan    @relation(fields: [planId], references: [id])
+  horarioId String
+  horario   Horario @relation(fields: [horarioId], references: [id])
+
+  @@id([planId, horarioId])
+  @@index([horarioId])
+  @@map("plan_horarios")
+}
+
+// ----------------------------------------------------------------------------
+// Recuperación de contraseña por correo: se guarda solo el HASH del código de
+// 6 dígitos, con vencimiento, límite de intentos y un solo uso.
+// ----------------------------------------------------------------------------
+
+model PasswordResetToken {
+  id        String    @id @default(uuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id])
+  codeHash  String
+  expiresAt DateTime
+  attempts  Int       @default(0)
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+  @@map("password_reset_tokens")
 }

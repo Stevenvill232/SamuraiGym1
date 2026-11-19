@@ -31,8 +31,8 @@ class AppShell extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final currentPath = GoRouterState.of(context).matchedLocation;
-    final rol = ref.watch(meProvider).valueOrNull?.role;
-    final visibles = _items.where((i) => puedeVer(i.path, rol)).toList();
+    final roles = ref.watch(meProvider).valueOrNull?.roles ?? <UserRole>{};
+    final visibles = _items.where((i) => puedeVer(i.path, roles)).toList();
 
     return Scaffold(
       body: Row(
@@ -63,9 +63,9 @@ class AppShell extends ConsumerWidget {
                                   fontWeight: FontWeight.w700,
                                 ),
                               ),
-                              if (rol != null)
+                              if (roles.isNotEmpty)
                                 Text(
-                                  etiquetaRol(rol),
+                                  etiquetaRoles(roles),
                                   style: const TextStyle(
                                       color: Colors.white54, fontSize: 12),
                                 ),

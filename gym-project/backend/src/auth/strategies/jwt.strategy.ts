@@ -7,6 +7,7 @@ export interface JwtPayload {
   sub: string; // userId
   cedula: string;
   role: string;
+  roles?: string[];
 }
 
 @Injectable()
@@ -22,6 +23,11 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   // Lo que retorna este método queda disponible como `request.user`
   // (ver JwtAuthGuard / @CurrentUser()).
   async validate(payload: JwtPayload) {
-    return { userId: payload.sub, cedula: payload.cedula, role: payload.role };
+    return {
+      userId: payload.sub,
+      cedula: payload.cedula,
+      role: payload.role,
+      roles: payload.roles ?? [payload.role],
+    };
   }
 }

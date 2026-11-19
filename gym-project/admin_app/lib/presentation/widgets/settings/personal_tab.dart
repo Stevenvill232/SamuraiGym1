@@ -25,11 +25,17 @@ class PersonalTab extends ConsumerWidget {
       Usuario u) async {
     switch (accion) {
       case 'editar':
-        final ok = await showDialog<bool>(
+        final mensaje = await showDialog<String>(
           context: context,
           builder: (_) => StaffFormDialog(usuario: u),
         );
-        if (ok == true) ref.invalidate(staffProvider);
+        if (mensaje != null) {
+          ref.invalidate(staffProvider);
+          if (context.mounted) {
+            ScaffoldMessenger.of(context)
+                .showSnackBar(SnackBar(content: Text(mensaje)));
+          }
+        }
         break;
       case 'clave':
         final ok = await showDialog<bool>(
@@ -45,9 +51,10 @@ class PersonalTab extends ConsumerWidget {
         final confirmar = await showDialog<bool>(
           context: context,
           builder: (ctx) => AlertDialog(
-            title: const Text('Desactivar usuario'),
-            content: Text(
-                '¿Desactivar a ${u.nombreCompleto}? Ya no podrá ingresar al sistema.'),
+            title: const Text('Quitar acceso de personal'),
+            content: Text(u.esMiembro
+                ? '¿Quitar el acceso de personal a ${u.nombreCompleto}? Dejará de entrar a esta aplicación, pero sigue activo como miembro del gimnasio.'
+                : '¿Desactivar a ${u.nombreCompleto}? Ya no podrá ingresar al sistema.'),
             actions: [
               TextButton(
                   onPressed: () => Navigator.of(ctx).pop(false),
@@ -56,14 +63,16 @@ class PersonalTab extends ConsumerWidget {
                 onPressed: () => Navigator.of(ctx).pop(true),
                 style: FilledButton.styleFrom(
                     backgroundColor: AppColors.estadoVencido),
-                child: const Text('Desactivar'),
+                child: const Text('Confirmar'),
               ),
             ],
           ),
         );
         if (confirmar != true) return;
         try {
-          await ref.read(apiClientProvider).delete('/users/${u.id}');
+          await ref
+              .read(apiClientProvider)
+              .delete('/users/${u.id}?como=personal');
           ref.invalidate(staffProvider);
         } on ApiException catch (e) {
           if (context.mounted) {
@@ -104,11 +113,19 @@ class PersonalTab extends ConsumerWidget {
               const SizedBox(width: 12),
               ElevatedButton.icon(
                 onPressed: () async {
-                  final ok = await showDialog<bool>(
+                  final mensaje = await showDialog<String>(
                     context: context,
                     builder: (_) => const StaffFormDialog(),
                   );
-                  if (ok == true) ref.invalidate(staffProvider);
+                  if (mensaje != null) {
+                    ref.invalidate(staffProvider);
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                        content: Text(mensaje),
+                        duration: const Duration(seconds: 7),
+                      ));
+                    }
+                  }
                 },
                 icon: const Icon(Icons.person_add_alt_1_rounded),
                 label: const Text('Nuevo personal'),
@@ -152,8 +169,8 @@ class PersonalTab extends ConsumerWidget {
                             style:
                                 const TextStyle(fontWeight: FontWeight.w600),
                           ),
-                          subtitle:
-                              Text('CC ${u.cedula} · ${etiquetaRol(u.role)}'),
+                          subtitle: Text(
+                              'CC ${u.cedula} · ${u.rolesPersonal.map(etiquetaRol).join(', ')}${u.esMiembro ? ' · también es miembro' : ''}'),
                           trailing: PopupMenuButton<String>(
                             onSelected: (v) => _accion(context, ref, v, u),
                             itemBuilder: (_) => [
@@ -164,7 +181,8 @@ class PersonalTab extends ConsumerWidget {
                                   child: Text('Restablecer contraseña')),
                               if (u.id != yo?.userId)
                                 const PopupMenuItem(
-                                    value: 'baja', child: Text('Desactivar')),
+                                    value: 'baja',
+                                    child: Text('Quitar acceso')),
                             ],
                           ),
                         ),

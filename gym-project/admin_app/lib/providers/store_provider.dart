@@ -160,6 +160,6 @@ class StoreNotifier extends StateNotifier<StoreState> {
   }
 }
 
-final storeProvider = StateNotifierProvider<StoreNotifier, StoreState>((ref) {
+final storeProvider = StateNotifierProvider.autoDispose<StoreNotifier, StoreState>((ref) {
   return StoreNotifier(ref.watch(apiClientProvider));
 });

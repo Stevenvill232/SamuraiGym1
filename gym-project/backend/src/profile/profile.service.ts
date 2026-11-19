@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { calcularEdad } from '../common/utils/edad.util';
+import { rolesEfectivos } from '../common/utils/roles.util';
 import {
   UpdateProfileDto,
   GuardarAlimentacionDto,
@@ -23,6 +24,7 @@ export class ProfileService {
       where: { id: userId },
       include: {
         role: true,
+        rolesAdicionales: true,
         preferenciaAlimentacion: true,
         perfilEntrenamiento: true,
       },
@@ -42,12 +44,14 @@ export class ProfileService {
       role,
       preferenciaAlimentacion,
       perfilEntrenamiento,
+      rolesAdicionales,
       ...rest
     } = user;
 
     return {
       ...rest,
       role: role?.nombre,
+      roles: rolesEfectivos(user),
       edad: calcularEdad(user.fechaNacimiento),
       pesoActual: ultimo?.peso ?? null,
       estaturaActual: ultimo?.estatura ?? null,

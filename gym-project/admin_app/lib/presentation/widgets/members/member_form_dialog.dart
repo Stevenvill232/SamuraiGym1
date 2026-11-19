@@ -74,6 +74,7 @@ class _MemberFormDialogState extends ConsumerState<MemberFormDialog> {
     });
 
     final notifier = ref.read(membersProvider.notifier);
+    String? aviso;
     final error = _esEdicion
         ? await notifier.actualizar(
             widget.miembro!.id,
@@ -95,7 +96,10 @@ class _MemberFormDialogState extends ConsumerState<MemberFormDialog> {
             correo: _correoCtrl.text.trim(),
             direccion: _direccionCtrl.text.trim(),
             sexo: _sexo,
-          );
+          ).then((r) {
+            aviso = r.aviso;
+            return r.error;
+          });
 
     if (!mounted) return;
     if (error != null) {
@@ -104,7 +108,10 @@ class _MemberFormDialogState extends ConsumerState<MemberFormDialog> {
         _error = error;
       });
     } else {
-      Navigator.of(context).pop(true);
+      Navigator.of(context).pop(aviso ??
+          (_esEdicion
+              ? 'Miembro actualizado correctamente'
+              : 'Miembro creado correctamente'));
     }
   }
 
@@ -246,7 +253,7 @@ class _MemberFormDialogState extends ConsumerState<MemberFormDialog> {
                     TextButton(
                       onPressed: _guardando
                           ? null
-                          : () => Navigator.of(context).pop(false),
+                          : () => Navigator.of(context).pop(),
                       child: const Text('Cancelar'),
                     ),
                     const SizedBox(width: 8),

@@ -1,5 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
+  ArrayUnique,
+  IsArray,
   IsEnum,
   IsNotEmpty,
   IsNumber,
@@ -54,11 +56,15 @@ export class CreatePlanDto {
   metodoPago: string;
 
   @ApiPropertyOptional({
-    description: 'Requerido si tipoPlan es BOXEO, KARATE o MMA',
+    type: [String],
+    description:
+      'Requerido (al menos uno) si tipoPlan es BOXEO, KARATE o MMA: los días/horas en que entrenará',
   })
   @IsOptional()
-  @IsUUID()
-  horarioId?: string;
+  @IsArray()
+  @ArrayUnique()
+  @IsUUID(undefined, { each: true })
+  horarioIds?: string[];
 
   @ApiPropertyOptional()
   @IsOptional()

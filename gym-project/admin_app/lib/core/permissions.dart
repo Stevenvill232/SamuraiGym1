@@ -26,8 +26,9 @@ const Map<String, Set<UserRole>> kPermisosModulo = {
   '/settings': _todos,
 };
 
-bool puedeVer(String ruta, UserRole? rol) =>
-    rol != null && (kPermisosModulo[ruta]?.contains(rol) ?? false);
+/// Ve el módulo quien tenga AL MENOS UNO de los roles permitidos.
+bool puedeVer(String ruta, Set<UserRole> roles) =>
+    roles.any((r) => kPermisosModulo[ruta]?.contains(r) ?? false);
 
 String etiquetaRol(UserRole? rol) => switch (rol) {
       UserRole.administrador => 'Administrador',
@@ -37,3 +38,9 @@ String etiquetaRol(UserRole? rol) => switch (rol) {
       UserRole.miembro => 'Miembro',
       _ => '',
     };
+
+/// Solo los roles de personal, ej. "Recepción, Entrenador".
+String etiquetaRoles(Set<UserRole> roles) => roles
+    .where((r) => r != UserRole.miembro && r != UserRole.desconocido)
+    .map(etiquetaRol)
+    .join(', ');

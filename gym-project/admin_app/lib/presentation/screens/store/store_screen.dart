@@ -42,15 +42,15 @@ class StoreScreen extends ConsumerWidget {
       BuildContext context, WidgetRef ref, Producto p) async {
     final confirmar = await showDialog<bool>(
       context: context,
-      builder: (_) => AlertDialog(
+      builder: (ctx) => AlertDialog(
         title: const Text('Desactivar producto'),
         content: Text('¿Seguro que deseas desactivar "${p.nombre}"?'),
         actions: [
           TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
+              onPressed: () => Navigator.of(ctx).pop(false),
               child: const Text('Cancelar')),
           FilledButton(
-            onPressed: () => Navigator.of(context).pop(true),
+            onPressed: () => Navigator.of(ctx).pop(true),
             style: FilledButton.styleFrom(backgroundColor: AppColors.estadoVencido),
             child: const Text('Desactivar'),
           ),

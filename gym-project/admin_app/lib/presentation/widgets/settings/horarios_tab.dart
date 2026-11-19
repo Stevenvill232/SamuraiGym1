@@ -47,7 +47,9 @@ class HorariosTab extends ConsumerWidget {
       {Map<String, dynamic>? horario}) async {
     final ok = await showDialog<bool>(
       context: context,
-      builder: (_) => HorarioDialog(horario: horario),
+      builder: (_) => horario == null
+          ? const HorariosBulkDialog()
+          : HorarioDialog(horario: horario),
     );
     if (ok == true) ref.invalidate(horariosAdminProvider);
   }
@@ -353,6 +355,238 @@ class _HorarioDialogState extends ConsumerState<HorarioDialog> {
         ElevatedButton(
           onPressed: _guardando ? null : _guardar,
           child: Text(_esEdicion ? 'Guardar' : 'Crear'),
+        ),
+      ],
+    );
+  }
+}
+
+class _FranjaEdit {
+  String dia;
+  TimeOfDay? inicio;
+  TimeOfDay? fin;
+  _FranjaEdit(this.dia, [this.inicio, this.fin]);
+}
+
+/// Crea de una vez los horarios de un deporte, cada uno con su día y su hora
+/// (ej. Lunes 17:00-18:00, Miércoles 17:00-18:00, Viernes 18:00-19:00).
+class HorariosBulkDialog extends ConsumerStatefulWidget {
+  const HorariosBulkDialog({super.key});
+
+  @override
+  ConsumerState<HorariosBulkDialog> createState() =>
+      _HorariosBulkDialogState();
+}
+
+class _HorariosBulkDialogState extends ConsumerState<HorariosBulkDialog> {
+  String _deporte = 'BOXEO';
+  final List<_FranjaEdit> _franjas = [
+    _FranjaEdit('LUNES', const TimeOfDay(hour: 18, minute: 0),
+        const TimeOfDay(hour: 19, minute: 0)),
+  ];
+  final _cupoCtrl = TextEditingController();
+  bool _guardando = false;
+  String? _error;
+
+  static String _fmt(TimeOfDay t) =>
+      '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
+
+  @override
+  void dispose() {
+    _cupoCtrl.dispose();
+    super.dispose();
+  }
+
+  void _agregarFranja() {
+    // Propone el siguiente día libre y copia la hora de la franja anterior.
+    final usados = _franjas.map((f) => f.dia).toSet();
+    final siguiente =
+        _dias.firstWhere((d) => !usados.contains(d), orElse: () => _dias.first);
+    final ultima = _franjas.isNotEmpty ? _franjas.last : null;
+    setState(
+        () => _franjas.add(_FranjaEdit(siguiente, ultima?.inicio, ultima?.fin)));
+  }
+
+  Future<void> _elegirHora(_FranjaEdit f, bool esInicio) async {
+    final t = await showTimePicker(
+      context: context,
+      initialTime:
+          (esInicio ? f.inicio : f.fin) ?? const TimeOfDay(hour: 18, minute: 0),
+    );
+    if (t != null) setState(() => esInicio ? f.inicio = t : f.fin = t);
+  }
+
+  Future<void> _guardar() async {
+    final vistos = <String>{};
+    for (final f in _franjas) {
+      if (f.inicio == null || f.fin == null) {
+        setState(() => _error = 'Completa la hora de inicio y fin de cada día');
+        return;
+      }
+      if (f.fin!.hour * 60 + f.fin!.minute <=
+          f.inicio!.hour * 60 + f.inicio!.minute) {
+        setState(() => _error =
+            'En ${_etiquetaDia(f.dia)} la hora de fin debe ser posterior a la de inicio');
+        return;
+      }
+      if (!vistos.add('${f.dia}|${_fmt(f.inicio!)}|${_fmt(f.fin!)}')) {
+        setState(() => _error =
+            '${_etiquetaDia(f.dia)} ${_fmt(f.inicio!)}-${_fmt(f.fin!)} está repetido');
+        return;
+      }
+    }
+    final cupoTxt = _cupoCtrl.text.trim();
+    final cupo = cupoTxt.isEmpty ? null : int.tryParse(cupoTxt);
+    if (cupoTxt.isNotEmpty && (cupo == null || cupo < 1)) {
+      setState(() => _error = 'El cupo debe ser un número mayor a 0');
+      return;
+    }
+
+    setState(() {
+      _guardando = true;
+      _error = null;
+    });
+    try {
+      await ref.read(apiClientProvider).post('/schedules/bulk', body: {
+        'deporte': _deporte,
+        'franjas': [
+          for (final f in _franjas)
+            {
+              'dia': f.dia,
+              'horaInicio': _fmt(f.inicio!),
+              'horaFin': _fmt(f.fin!),
+            },
+        ],
+        if (cupo != null) 'cupo': cupo,
+      });
+      if (mounted) Navigator.of(context).pop(true);
+    } on ApiException catch (e) {
+      if (mounted) {
+        setState(() {
+          _guardando = false;
+          _error = e.message;
+        });
+      }
+    } catch (_) {
+      // Cualquier otro fallo inesperado: nunca dejar el diálogo cargando.
+      if (mounted) {
+        setState(() {
+          _guardando = false;
+          _error = 'No se pudo guardar. Intenta de nuevo.';
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Nuevo horario'),
+      content: SizedBox(
+        width: 560,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              DropdownButtonFormField<String>(
+                value: _deporte,
+                decoration: const InputDecoration(labelText: 'Deporte'),
+                items: _deportes
+                    .map((d) => DropdownMenuItem(
+                        value: d, child: Text(_etiquetaDeporte(d))))
+                    .toList(),
+                onChanged: (v) => setState(() => _deporte = v!),
+              ),
+              const SizedBox(height: 16),
+              Text('Días y horas en que se entrena',
+                  style: Theme.of(context).textTheme.titleSmall),
+              const SizedBox(height: 4),
+              const Text(
+                'Cada día puede tener su propia hora. Un miembro podrá elegir uno o varios de estos horarios.',
+                style: TextStyle(fontSize: 12, color: AppColors.textMuted),
+              ),
+              const SizedBox(height: 10),
+              for (var i = 0; i < _franjas.length; i++)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        flex: 3,
+                        child: DropdownButtonFormField<String>(
+                          value: _franjas[i].dia,
+                          isDense: true,
+                          decoration: const InputDecoration(labelText: 'Día'),
+                          items: _dias
+                              .map((d) => DropdownMenuItem(
+                                  value: d, child: Text(_etiquetaDia(d))))
+                              .toList(),
+                          onChanged: (v) =>
+                              setState(() => _franjas[i].dia = v!),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        flex: 2,
+                        child: OutlinedButton(
+                          onPressed: () => _elegirHora(_franjas[i], true),
+                          child: Text(_franjas[i].inicio == null
+                              ? 'Inicio'
+                              : _fmt(_franjas[i].inicio!)),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        flex: 2,
+                        child: OutlinedButton(
+                          onPressed: () => _elegirHora(_franjas[i], false),
+                          child: Text(_franjas[i].fin == null
+                              ? 'Fin'
+                              : _fmt(_franjas[i].fin!)),
+                        ),
+                      ),
+                      IconButton(
+                        tooltip: 'Quitar este día',
+                        icon: const Icon(Icons.close_rounded),
+                        onPressed: _franjas.length == 1
+                            ? null
+                            : () => setState(() => _franjas.removeAt(i)),
+                      ),
+                    ],
+                  ),
+                ),
+              TextButton.icon(
+                onPressed: _franjas.length >= 14 ? null : _agregarFranja,
+                icon: const Icon(Icons.add_rounded, size: 18),
+                label: const Text('Agregar otro día'),
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: _cupoCtrl,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                    labelText: 'Cupo por clase (opcional)'),
+              ),
+              if (_error != null) ...[
+                const SizedBox(height: 12),
+                Text(_error!,
+                    style: const TextStyle(color: AppColors.estadoVencido)),
+              ],
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _guardando ? null : () => Navigator.of(context).pop(false),
+          child: const Text('Cancelar'),
+        ),
+        ElevatedButton(
+          onPressed: _guardando ? null : _guardar,
+          child: Text(_franjas.length == 1
+              ? 'Crear horario'
+              : 'Crear ${_franjas.length} horarios'),
         ),
       ],
     );

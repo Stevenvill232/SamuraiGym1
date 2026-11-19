@@ -68,6 +68,15 @@ class PlanListTile extends StatelessWidget {
                     style: const TextStyle(
                         color: AppColors.textMuted, fontSize: 13),
                   ),
+                  if (item.horarios.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: Text(
+                        item.horarios.join('  ·  '),
+                        style: const TextStyle(
+                            color: AppColors.textMuted, fontSize: 13),
+                      ),
+                    ),
                 ],
               ),
             ),

@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'api_exception.dart';
 
@@ -48,7 +49,7 @@ class ApiClient {
   }) async {
     try {
       final res = await _dio.get(path, queryParameters: query);
-      return res.data as Map<String, dynamic>;
+      return _asMap(res.data);
     } on DioException catch (e) {
       throw _mapError(e);
     }
@@ -72,7 +73,7 @@ class ApiClient {
   }) async {
     try {
       final res = await _dio.post(path, data: body);
-      return res.data as Map<String, dynamic>;
+      return _asMap(res.data);
     } on DioException catch (e) {
       throw _mapError(e);
     }
@@ -84,7 +85,7 @@ class ApiClient {
   }) async {
     try {
       final res = await _dio.patch(path, data: body);
-      return res.data as Map<String, dynamic>;
+      return _asMap(res.data);
     } on DioException catch (e) {
       throw _mapError(e);
     }
@@ -96,7 +97,7 @@ class ApiClient {
   }) async {
     try {
       final res = await _dio.put(path, data: body);
-      return res.data as Map<String, dynamic>;
+      return _asMap(res.data);
     } on DioException catch (e) {
       throw _mapError(e);
     }
@@ -108,6 +109,17 @@ class ApiClient {
     } on DioException catch (e) {
       throw _mapError(e);
     }
+  }
+
+  /// No toda respuesta es un objeto: algunas (ej. crear varios horarios)
+  /// devuelven una lista. Antes eso lanzaba un error de tipo DESPUÉS de que
+  /// el servidor ya había guardado, dejando el diálogo cargando para siempre.
+  Map<String, dynamic> _asMap(dynamic data) {
+    if (data is Map) return Map<String, dynamic>.from(data);
+    if (data == null || (data is String && data.isEmpty)) {
+      return <String, dynamic>{};
+    }
+    return <String, dynamic>{'data': data};
   }
 
   ApiException _mapError(DioException e) {
@@ -134,7 +146,15 @@ class ApiClient {
       return ApiException.sinPermiso();
     }
     if (status != null && status >= 500) {
-      return ApiException.servidor();
+      // 503 = el servidor sabe qué pasó y trae un mensaje para el usuario
+      // (ej. "no se pudo enviar el correo").
+      if (status == 503 && backendMessage != null) {
+        return ApiException(backendMessage.toString(), statusCode: 503);
+      }
+      final detalle = kDebugMode
+          ? '${e.requestOptions.method} ${e.requestOptions.path} → $status'
+          : null;
+      return ApiException.servidor(detalle);
     }
 
     final msg = backendMessage is List

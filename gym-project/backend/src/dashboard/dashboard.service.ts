@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { calcularEstadoPlan } from '../plans/plan-estado.util';
 import { calcularEdad } from '../common/utils/edad.util';
+import { INCLUDE_HORARIOS, aplanarHorarios } from '../plans/plan-horarios.util';
 
 const DIA_MS = 24 * 60 * 60 * 1000;
 
@@ -32,7 +33,14 @@ export class DashboardService {
     const [miembrosActivos, ingresosHoy, ingresosMes, planesEnVentana] =
       await Promise.all([
         this.prisma.user.count({
-          where: { estado: 'ACTIVO', role: { nombre: 'MIEMBRO' } },
+          // Cuenta a quien es miembro como rol principal o adicional.
+          where: {
+            estado: 'ACTIVO',
+            OR: [
+              { role: { nombre: 'MIEMBRO' } },
+              { rolesAdicionales: { some: { nombre: 'MIEMBRO' } } },
+            ],
+          },
         }),
         this.prisma.ingreso.findMany({
           where: { fecha: { gte: hoy, lt: manana } },
@@ -100,7 +108,7 @@ export class DashboardService {
         this.prisma.user.findUnique({ where: { id: userId } }),
         this.prisma.plan.findMany({
           where: { miembroId: userId },
-          include: { horario: true },
+          include: INCLUDE_HORARIOS,
           orderBy: { fechaVencimiento: 'desc' },
         }),
         this.prisma.historialFisico.findFirst({
@@ -119,7 +127,7 @@ export class DashboardService {
 
     const hace30Dias = Date.now() - 30 * DIA_MS;
     const planesVisibles = planes
-      .map((p: any) => ({ ...p, estado: calcularEstadoPlan(p) }))
+      .map((p: any) => aplanarHorarios({ ...p, estado: calcularEstadoPlan(p) }))
       .filter(
         (p: any) =>
           p.estado === 'ACTIVO' ||

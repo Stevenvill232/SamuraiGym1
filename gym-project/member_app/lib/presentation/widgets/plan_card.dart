@@ -111,15 +111,24 @@ class PlanCard extends StatelessWidget {
               ..._bloqueTiquetera(context, plan, color, muted)
             else
               ..._bloqueVigencia(context, plan, color, muted),
-            if (detalle.horario != null)
+            if (detalle.horarios.isNotEmpty)
               Padding(
                 padding: const EdgeInsets.only(top: 10),
-                child: Row(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Icon(Icons.schedule_rounded,
-                        size: 16, color: AppColors.textMuted),
-                    const SizedBox(width: 6),
-                    Text(detalle.horario!.etiqueta),
+                    for (final h in detalle.horarios)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 2),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.schedule_rounded,
+                                size: 16, color: AppColors.textMuted),
+                            const SizedBox(width: 6),
+                            Text(h.etiqueta),
+                          ],
+                        ),
+                      ),
                   ],
                 ),
               ),

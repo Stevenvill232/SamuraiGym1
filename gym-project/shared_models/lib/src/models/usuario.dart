@@ -63,6 +63,10 @@ class Usuario {
   final bool activo;
   final int? edad; // calculada por el backend, nunca se envía al crear/editar
 
+  /// TODOS los roles de la persona (una misma persona puede ser, por ejemplo,
+  /// recepcionista y además miembro). [role] es el principal.
+  final List<UserRole> roles;
+
   const Usuario({
     required this.id,
     required this.cedula,
@@ -77,9 +81,16 @@ class Usuario {
     this.sexo,
     this.activo = true,
     this.edad,
+    this.roles = const [],
   });
 
   String get nombreCompleto => '$nombres $apellidos';
+
+  bool get esMiembro => roles.contains(UserRole.miembro) || role == UserRole.miembro;
+
+  List<UserRole> get rolesPersonal => roles
+      .where((r) => r != UserRole.miembro && r != UserRole.desconocido)
+      .toList();
 
   factory Usuario.fromJson(Map<String, dynamic> json) {
     return Usuario(
@@ -98,6 +109,11 @@ class Usuario {
       role: UserRole.fromApi(json['role'] as String? ?? ''),
       activo: (json['estado'] as String?) != 'INACTIVO',
       edad: json['edad'] as int?,
+      roles: (json['roles'] is List)
+          ? (json['roles'] as List)
+              .map((e) => UserRole.fromApi(e.toString()))
+              .toList()
+          : [UserRole.fromApi(json['role'] as String? ?? '')],
     );
   }
 

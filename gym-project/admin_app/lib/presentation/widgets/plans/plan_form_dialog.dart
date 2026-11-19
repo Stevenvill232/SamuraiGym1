@@ -5,6 +5,17 @@ import '../../../providers/auth_provider.dart';
 import '../../../providers/plans_provider.dart';
 import '../../../providers/settings_provider.dart';
 
+String _etiquetaDia(String d) => switch (d) {
+      'LUNES' => 'Lunes',
+      'MARTES' => 'Martes',
+      'MIERCOLES' => 'Miércoles',
+      'JUEVES' => 'Jueves',
+      'VIERNES' => 'Viernes',
+      'SABADO' => 'Sábado',
+      'DOMINGO' => 'Domingo',
+      _ => d,
+    };
+
 class PlanFormDialog extends ConsumerStatefulWidget {
   /// Si ya se conoce el miembro (ej. viniendo desde su ficha), se preselecciona
   /// y no se muestra el buscador.
@@ -31,7 +42,9 @@ class _PlanFormDialogState extends ConsumerState<PlanFormDialog> {
   String? _nombreMiembro;
   TipoPlan _tipoPlan = TipoPlan.gimnasioMes;
   late String _metodoPago;
-  String? _horarioId;
+  // Boxeo/Karate/MMA: el miembro puede entrenar varios días, cada uno en su
+  // horario; aquí se eligen todos los que corresponden.
+  final Set<String> _horarioIds = {};
   bool _guardando = false;
   String? _error;
 
@@ -89,7 +102,7 @@ class _PlanFormDialogState extends ConsumerState<PlanFormDialog> {
       _tipoPlan = nuevo;
       _precioCtrl.text =
           ref.read(settingsProvider).settings.precioDe(nuevo).toStringAsFixed(0);
-      _horarioId = null;
+      _horarioIds.clear();
     });
   }
 
@@ -99,8 +112,8 @@ class _PlanFormDialogState extends ConsumerState<PlanFormDialog> {
       return;
     }
     if (!_formKey.currentState!.validate()) return;
-    if (_esDeporte && _horarioId == null) {
-      setState(() => _error = 'Selecciona un horario');
+    if (_esDeporte && _horarioIds.isEmpty) {
+      setState(() => _error = 'Selecciona al menos un horario (día y hora)');
       return;
     }
 
@@ -114,7 +127,7 @@ class _PlanFormDialogState extends ConsumerState<PlanFormDialog> {
           tipoPlan: _tipoPlan,
           precio: double.parse(_precioCtrl.text),
           metodoPago: _metodoPago,
-          horarioId: _horarioId,
+          horarioIds: _horarioIds.toList(),
           observaciones: _observacionesCtrl.text.trim(),
         );
 
@@ -345,16 +358,48 @@ class _PlanFormDialogState extends ConsumerState<PlanFormDialog> {
             style: TextStyle(color: AppColors.textMuted),
           );
         }
-        return DropdownButtonFormField<String>(
-          value: _horarioId,
-          decoration: const InputDecoration(labelText: 'Horario'),
-          items: horarios
-              .map((h) => DropdownMenuItem(
-                    value: h['id'] as String,
-                    child: Text('${h['dia']} · ${h['horaInicio']} - ${h['horaFin']}'),
-                  ))
-              .toList(),
-          onChanged: (v) => setState(() => _horarioId = v),
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Horarios (elige los días en que entrenará)',
+                style: Theme.of(context).textTheme.titleSmall),
+            const SizedBox(height: 6),
+            Container(
+              constraints: const BoxConstraints(maxHeight: 220),
+              decoration: BoxDecoration(
+                border: Border.all(color: AppColors.borderSubtle),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: ListView(
+                shrinkWrap: true,
+                children: [
+                  for (final h in horarios)
+                    CheckboxListTile(
+                      dense: true,
+                      value: _horarioIds.contains(h['id'] as String),
+                      onChanged: (v) => setState(() {
+                        if (v == true) {
+                          _horarioIds.add(h['id'] as String);
+                        } else {
+                          _horarioIds.remove(h['id'] as String);
+                        }
+                      }),
+                      title: Text(
+                          '${_etiquetaDia(h['dia'] as String)} · ${h['horaInicio']} - ${h['horaFin']}'),
+                    ),
+                ],
+              ),
+            ),
+            if (_horarioIds.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Text(
+                  '${_horarioIds.length} horario(s) seleccionado(s)',
+                  style: const TextStyle(
+                      fontSize: 12, color: AppColors.textMuted),
+                ),
+              ),
+          ],
         );
       },
     );

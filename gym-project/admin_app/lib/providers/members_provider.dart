@@ -56,7 +56,7 @@ class MembersNotifier extends StateNotifier<MembersState> {
 
   void buscar(String texto) => cargar(busqueda: texto);
 
-  Future<String?> crear({
+  Future<({String? error, String? aviso})> crear({
     required String cedula,
     required String nombres,
     required String apellidos,
@@ -68,7 +68,7 @@ class MembersNotifier extends StateNotifier<MembersState> {
     String? sexo,
   }) async {
     try {
-      await _api.post('/users', body: {
+      final data = await _api.post('/users', body: {
         'cedula': cedula,
         'nombres': nombres,
         'apellidos': apellidos,
@@ -82,9 +82,18 @@ class MembersNotifier extends StateNotifier<MembersState> {
         if (sexo != null && sexo.isNotEmpty) 'sexo': sexo,
       });
       await cargar();
-      return null; // sin error
+      // Si la cédula ya existía, el backend suma el rol a la MISMA persona.
+      String? aviso;
+      if (data['reactivado'] == true) {
+        aviso =
+            'Esta persona estaba desactivada: se reactivó con los datos nuevos.';
+      } else if (data['yaExistia'] == true) {
+        aviso =
+            'Esta persona ya estaba registrada en el sistema. Ahora también es miembro y conserva su contraseña.';
+      }
+      return (error: null, aviso: aviso);
     } on ApiException catch (e) {
-      return e.message;
+      return (error: e.message, aviso: null);
     }
   }
 
@@ -118,7 +127,9 @@ class MembersNotifier extends StateNotifier<MembersState> {
 
   Future<String?> eliminar(String id) async {
     try {
-      await _api.delete('/users/$id');
+      // Solo quita la condición de miembro: si la persona también es
+      // personal, su cuenta de personal sigue activa.
+      await _api.delete('/users/$id?como=miembro');
       await cargar();
       return null;
     } on ApiException catch (e) {
@@ -128,6 +139,6 @@ class MembersNotifier extends StateNotifier<MembersState> {
 }
 
 final membersProvider =
-    StateNotifierProvider<MembersNotifier, MembersState>((ref) {
+    StateNotifierProvider.autoDispose<MembersNotifier, MembersState>((ref) {
   return MembersNotifier(ref.watch(apiClientProvider));
 });

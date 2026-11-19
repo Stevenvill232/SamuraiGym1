@@ -24,16 +24,16 @@ class _MembersScreenState extends ConsumerState<MembersScreen> {
   }
 
   Future<void> _abrirFormulario({Usuario? miembro}) async {
-    final guardado = await showDialog<bool>(
+    // El diálogo devuelve el mensaje a mostrar (o null si se canceló).
+    final mensaje = await showDialog<String>(
       context: context,
       builder: (_) => MemberFormDialog(miembro: miembro),
     );
-    if (guardado == true && mounted) {
+    if (mensaje != null && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(miembro == null
-              ? 'Miembro creado correctamente'
-              : 'Miembro actualizado correctamente'),
+          content: Text(mensaje),
+          duration: const Duration(seconds: 6),
         ),
       );
     }
@@ -54,7 +54,7 @@ class _MembersScreenState extends ConsumerState<MembersScreen> {
   Future<void> _confirmarEliminar(Usuario miembro) async {
     final confirmar = await showDialog<bool>(
       context: context,
-      builder: (_) => AlertDialog(
+      builder: (ctx) => AlertDialog(
         title: const Text('Desactivar miembro'),
         content: Text(
           '¿Seguro que deseas desactivar a ${miembro.nombreCompleto}? '
@@ -62,11 +62,11 @@ class _MembersScreenState extends ConsumerState<MembersScreen> {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
+            onPressed: () => Navigator.of(ctx).pop(false),
             child: const Text('Cancelar'),
           ),
           FilledButton(
-            onPressed: () => Navigator.of(context).pop(true),
+            onPressed: () => Navigator.of(ctx).pop(true),
             style: FilledButton.styleFrom(
                 backgroundColor: AppColors.estadoVencido),
             child: const Text('Desactivar'),
