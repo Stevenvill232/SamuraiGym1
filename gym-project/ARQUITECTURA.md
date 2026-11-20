@@ -488,3 +488,7 @@ se entra a la pantalla; Contabilidad y Dashboard tienen además botón
 - **Pendiente — push (FCM):** requiere un proyecto de Firebase propio (`flutterfire configure`, cuenta de servicio en
   el backend, registro del token del dispositivo). Todo el historial y la generación ya existen; el push solo
   añade el aviso en el teléfono con la app cerrada.
+- **Notificaciones del sistema (teléfono):** la app de miembros usa `flutter_local_notifications`. Mientras está abierta
+  o recién enviada a segundo plano, consulta cada 30 s `POST /notifications/me/claim`; el servidor devuelve los avisos
+  recientes sin leer que aún no se habían mostrado y los marca como entregados (`entregadaAt`), de modo que nunca se
+  repiten, ni siquiera tras reiniciar la app. Con la app cerrada del todo no llegan: eso requiere push (FCM).

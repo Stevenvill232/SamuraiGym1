@@ -14,6 +14,7 @@ import '../../presentation/screens/profile/training_screen.dart';
 import '../../presentation/screens/profile/password_screen.dart';
 import '../../presentation/screens/notifications/notifications_screen.dart';
 import '../../presentation/widgets/nav/member_shell.dart';
+import '../../services/notification_watcher.dart';
 
 class _AuthRefreshNotifier extends ChangeNotifier {
   _AuthRefreshNotifier(Ref ref) {
@@ -68,7 +69,8 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const NotificationsScreen(),
       ),
       ShellRoute(
-        builder: (context, state, child) => MemberShell(child: child),
+        builder: (context, state, child) =>
+            NotificationWatcher(child: MemberShell(child: child)),
         routes: [
           GoRoute(
             path: '/dashboard',

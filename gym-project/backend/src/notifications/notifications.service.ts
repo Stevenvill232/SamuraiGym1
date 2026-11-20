@@ -175,6 +175,30 @@ export class NotificationsService implements OnApplicationBootstrap {
     });
   }
 
+  /**
+   * Avisos que el teléfono todavía no mostró como notificación del sistema.
+   * Se marcan como entregados en el mismo paso, así que NUNCA se repiten
+   * (aunque se reinicie la app). Solo se devuelven los recientes (últimos 3
+   * días), sin leer, y como máximo 5, para no inundar al abrir la app tras
+   * mucho tiempo.
+   */
+  async reclamar(userId: string) {
+    const desde = new Date(Date.now() - 3 * DIA_MS);
+    const pendientes: any[] = await this.prisma.historialNotificacion.findMany({
+      where: { miembroId: userId, entregadaAt: null },
+      orderBy: { fechaEnvio: 'desc' },
+    });
+    if (pendientes.length === 0) return [];
+
+    await this.prisma.historialNotificacion.updateMany({
+      where: { id: { in: pendientes.map((p) => p.id) } },
+      data: { entregadaAt: new Date() },
+    });
+    return pendientes
+      .filter((p) => !p.leida && p.fechaEnvio >= desde)
+      .slice(0, 5);
+  }
+
   async noLeidas(userId: string) {
     const count = await this.prisma.historialNotificacion.count({
       where: { miembroId: userId, leida: false },

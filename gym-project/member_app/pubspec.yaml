@@ -27,6 +27,7 @@ dependencies:
 
   shared_models:
     path: ../shared_models
+  flutter_local_notifications: 19.0.0
 
 dev_dependencies:
   flutter_test:

@@ -72,6 +72,17 @@ class MemberRepository {
         .toList();
   }
 
+  /// Avisos que el teléfono aún no mostró como notificación del sistema (el
+  /// servidor los marca como entregados al reclamarlos, así no se repiten).
+  Future<List<Notificacion>> reclamarAvisos() async {
+    final d = await _api.post('/notifications/me/claim');
+    final lista = d['data'];
+    if (lista is! List) return const [];
+    return lista
+        .map((j) => Notificacion.fromJson(Map<String, dynamic>.from(j as Map)))
+        .toList();
+  }
+
   Future<int> noLeidas() async {
     final d = await _api.get('/notifications/me/unread-count');
     return (d['count'] as num?)?.toInt() ?? 0;

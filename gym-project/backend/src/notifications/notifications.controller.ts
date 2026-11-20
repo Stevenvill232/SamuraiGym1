@@ -27,6 +27,12 @@ export class NotificationsController {
     return this.service.noLeidas(user.userId);
   }
 
+  // La app del teléfono lo consulta para mostrar notificaciones del sistema.
+  @Post('me/claim')
+  reclamar(@CurrentUser() user: AuthenticatedUser) {
+    return this.service.reclamar(user.userId);
+  }
+
   @Patch('me/read-all')
   marcarTodas(@CurrentUser() user: AuthenticatedUser) {
     return this.service.marcarTodas(user.userId);
