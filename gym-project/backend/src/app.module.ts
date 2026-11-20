@@ -12,6 +12,7 @@ import { StoreModule } from './store/store.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { SettingsModule } from './settings/settings.module';
 import { MailModule } from './mail/mail.module';
+import { NotificationsModule } from './notifications/notifications.module';
 import { ProfileModule } from './profile/profile.module';
 import { ProgressModule } from './progress/progress.module';
 
@@ -32,6 +33,7 @@ import { ProgressModule } from './progress/progress.module';
     AccountingModule, // ingresos, gastos y resumen financiero
     StoreModule, // productos y ventas (con descuento de stock atómico)
     DashboardModule, // KPIs + alertas de vencimiento del panel admin
+    NotificationsModule, // avisos de vencimiento + historial del miembro
     MailModule, // envío de correos (recuperación de contraseña)
     SettingsModule, // Configuración editable (precios, catálogos, info del gimnasio)
     ProfileModule, // autoservicio del miembro: perfil + preferencias

@@ -330,3 +330,34 @@ class MemberDashboard {
     );
   }
 }
+
+// ---------------------------------------------------------------------- //
+// Notificaciones
+// ---------------------------------------------------------------------- //
+
+class Notificacion {
+  final String id;
+  final String titulo;
+  final String mensaje;
+  final String tipo; // VENCIMIENTO_PLAN | TIQUETERA | PAGO | GENERAL
+  final bool leida;
+  final DateTime fecha;
+
+  const Notificacion({
+    required this.id,
+    required this.titulo,
+    required this.mensaje,
+    required this.tipo,
+    required this.leida,
+    required this.fecha,
+  });
+
+  factory Notificacion.fromJson(Map<String, dynamic> j) => Notificacion(
+        id: j['id'] as String,
+        titulo: (j['titulo'] as String?) ?? '',
+        mensaje: (j['mensaje'] as String?) ?? '',
+        tipo: (j['tipo'] as String?) ?? 'GENERAL',
+        leida: (j['leida'] as bool?) ?? false,
+        fecha: DateTime.parse(j['fechaEnvio'] as String),
+      );
+}

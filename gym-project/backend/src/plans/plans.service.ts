@@ -14,6 +14,10 @@ import {
 import { DIA_MS, calcularEstadoPlan } from './plan-estado.util';
 import { INCLUDE_HORARIOS, aplanarHorarios } from './plan-horarios.util';
 import { esMiembro, rolesEfectivos } from '../common/utils/roles.util';
+import {
+  NotificationsService,
+  formatearFecha,
+} from '../notifications/notifications.service';
 
 const DEPORTES: TipoPlanDto[] = [
   TipoPlanDto.BOXEO,
@@ -34,6 +38,7 @@ export class PlansService {
   constructor(
     private prisma: PrismaService,
     private settings: SettingsService,
+    private notifications: NotificationsService,
   ) {}
 
   async create(dto: CreatePlanDto, adminId: string) {
@@ -122,6 +127,14 @@ export class PlansService {
       return nuevoPlan;
     });
 
+    // Aviso al miembro (no bloquea ni rompe el registro si falla).
+    await this.notifications.notificar(
+      dto.miembroId,
+      'PAGO',
+      'Plan registrado',
+      `Se registró tu ${this.etiquetaPlan(dto.tipoPlan)}. Vence el ${formatearFecha(fechaVencimiento)}.`,
+    );
+
     return this.findOne(plan.id);
   }
 
@@ -197,6 +210,16 @@ export class PlansService {
         data: { diasUtilizados, estado: nuevoEstado as any },
       }),
     ]);
+
+    const quedan = plan.diasTotales - diasUtilizados;
+    await this.notifications.notificar(
+      plan.miembroId,
+      'TIQUETERA',
+      quedan === 0 ? 'Tu tiquetera se agotó' : 'Día de tiquetera registrado',
+      quedan === 0
+        ? 'Usaste todos los días de tu tiquetera. Comunícate con el gimnasio para renovarla.'
+        : `Registramos un día de tu tiquetera. Te ${quedan === 1 ? 'queda 1 día' : `quedan ${quedan} días`}.`,
+    );
 
     return this.findOne(planId);
   }

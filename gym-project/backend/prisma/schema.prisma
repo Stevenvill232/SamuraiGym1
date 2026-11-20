@@ -403,6 +403,8 @@ model HistorialNotificacion {
   tipo       String // 'VENCIMIENTO_PLAN' | 'TIQUETERA' | 'PAGO' | 'GENERAL'
   leida      Boolean  @default(false)
   fechaEnvio DateTime @default(now())
+  // "<planId>:<evento>" — evita enviar dos veces el mismo aviso automático
+  claveUnica String?  @unique
 
   @@index([miembroId])
   @@map("historial_notificaciones")

@@ -268,6 +268,15 @@ token, así que un miembro no puede ver ni tocar datos de otro.
 `POST /plans` ahora recibe `horarioIds` (lista) en lugar de un único
 `horarioId`.
 
+**Implementadas (Fase 6):**
+
+| Método | Ruta | Rol requerido | Descripción |
+|---|---|---|---|
+| GET | `/notifications/me` | cualquiera autenticado | Últimos 50 avisos del usuario |
+| GET | `/notifications/me/unread-count` | cualquiera autenticado | Cantidad sin leer (campana) |
+| PATCH | `/notifications/:id/read` · `/notifications/me/read-all` | cualquiera autenticado | Marcar como leído(s) |
+| POST | `/notifications/run-job` | ADMIN | Genera los avisos ahora (para probar) |
+
 **Planeadas por fase:**
 - Fase 6: `/notifications`, job diario (`@Cron`, no expuesto por HTTP) que
   recalcula estados de planes y dispara FCM.
@@ -348,7 +357,7 @@ token, así que un miembro no puede ver ni tocar datos de otro.
 | 3 | Backend base: auth + roles + módulo Miembros | Listo |
 | 4 | Planes y Pagos, Tiqueteras, Contabilidad, Tienda (backend + UI admin) | Listo |
 | 5 | Configuración (admin) + app de miembros completa: dashboard, línea de plan, perfil, progreso | Listo |
-| 6 | Notificaciones push + job diario de vencimientos | Pendiente |
+| 6 | Notificaciones: avisos dentro de la app + job automático | Listo (el envío push por FCM queda pendiente) |
 | 7 | Integración de IA (rutina, alimentación, chat) | Pendiente |
 | 8 | Gráficos avanzados, pulido visual, pruebas, empaquetado final | Pendiente |
 
@@ -464,3 +473,18 @@ se entra a la pantalla; Contabilidad y Dashboard tienen además botón
 - Calendarios y selector de hora en español (`flutter_localizations`).
 - Los errores 5xx muestran en modo debug qué petición falló, y el backend
   registra método y ruta de cada error, para ubicar rápido cualquier falla.
+
+---
+
+## 11. Decisiones de la Fase 6 (notificaciones)
+
+- **Generación automática:** `NotificationsService` corre al iniciar el servidor y **cada hora** (`@nestjs/schedule`).
+  Recalcula el estado real de los planes y crea los avisos de vencimiento (2 días, 1 día, vencido) según
+  Configuración > Notificaciones. Cada aviso tiene una clave única `<plan>:<evento>`, por lo que repetir la
+  ejecución nunca duplica avisos y, si el servidor estuvo apagado, los avisos se generan al volver.
+- **Avisos por eventos:** pago registrado (plan creado) y día de tiquetera usado / tiquetera agotada. La creación
+  de un aviso nunca interrumpe la operación que la origina.
+- **Privacidad:** los endpoints `/notifications/me/*` operan siempre sobre el usuario del token.
+- **Pendiente — push (FCM):** requiere un proyecto de Firebase propio (`flutterfire configure`, cuenta de servicio en
+  el backend, registro del token del dispositivo). Todo el historial y la generación ya existen; el push solo
+  añade el aviso en el teléfono con la app cerrada.

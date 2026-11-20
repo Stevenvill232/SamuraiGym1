@@ -151,7 +151,8 @@ siempre pasa por el backend. Esto se implementa en la Fase 7.
 ✅ Fase 5 — Configuración del admin (precios, catálogos, horarios, personal,
    info del gimnasio) y app de miembros completa (dashboard, línea de plan,
    perfil con preferencias, progreso con gráfico)
-⏳ Fase 6 — Notificaciones push (FCM) + job diario de vencimientos
+✅ Fase 6 — Notificaciones: avisos en la app (campana) + job automático de vencimientos
+   (el envío push por FCM queda para cuando quieras configurar Firebase)
 ⏳ Fase 7 — Integración de IA (rutinas, alimentación, chat)
 ⏳ Fase 8 — Pulido, gráficos avanzados, pruebas
 

@@ -15,7 +15,10 @@ class MemberDashboardScreen extends ConsumerWidget {
     final contacto = textoContacto(ref.watch(gymSettingsProvider).valueOrNull);
 
     return RefreshIndicator(
-      onRefresh: () => ref.refresh(memberDashboardProvider.future),
+      onRefresh: () {
+        ref.invalidate(unreadCountProvider);
+        return ref.refresh(memberDashboardProvider.future);
+      },
       child: ListView(
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.all(24),
@@ -88,6 +91,7 @@ class MemberDashboardScreen extends ConsumerWidget {
               ],
             ),
           ),
+          const _CampanaNotificaciones(),
         ],
       ),
       const SizedBox(height: 20),
@@ -268,6 +272,25 @@ class _ErrorCard extends StatelessWidget {
                 onPressed: onReintentar, child: const Text('Reintentar')),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// Campana con el contador de avisos sin leer.
+class _CampanaNotificaciones extends ConsumerWidget {
+  const _CampanaNotificaciones();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final n = ref.watch(unreadCountProvider).valueOrNull ?? 0;
+    return IconButton(
+      tooltip: 'Notificaciones',
+      onPressed: () => context.push('/notifications'),
+      icon: Badge(
+        isLabelVisible: n > 0,
+        label: Text(n > 99 ? '99+' : '$n'),
+        child: const Icon(Icons.notifications_none_rounded, size: 28),
       ),
     );
   }

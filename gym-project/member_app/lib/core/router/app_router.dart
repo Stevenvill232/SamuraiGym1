@@ -12,6 +12,7 @@ import '../../presentation/screens/profile/edit_profile_screen.dart';
 import '../../presentation/screens/profile/nutrition_screen.dart';
 import '../../presentation/screens/profile/training_screen.dart';
 import '../../presentation/screens/profile/password_screen.dart';
+import '../../presentation/screens/notifications/notifications_screen.dart';
 import '../../presentation/widgets/nav/member_shell.dart';
 
 class _AuthRefreshNotifier extends ChangeNotifier {
@@ -61,6 +62,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/profile/password',
         builder: (context, state) => const PasswordScreen(),
+      ),
+      GoRoute(
+        path: '/notifications',
+        builder: (context, state) => const NotificationsScreen(),
       ),
       ShellRoute(
         builder: (context, state, child) => MemberShell(child: child),

@@ -64,6 +64,26 @@ class MemberRepository {
 
   Future<AppSettings> settings() async =>
       AppSettings.fromJson(await _api.get('/settings'));
+
+  Future<List<Notificacion>> notificaciones() async {
+    final data = await _api.getList('/notifications/me');
+    return data
+        .map((j) => Notificacion.fromJson(Map<String, dynamic>.from(j as Map)))
+        .toList();
+  }
+
+  Future<int> noLeidas() async {
+    final d = await _api.get('/notifications/me/unread-count');
+    return (d['count'] as num?)?.toInt() ?? 0;
+  }
+
+  Future<void> marcarNotificacionLeida(String id) async {
+    await _api.patch('/notifications/$id/read');
+  }
+
+  Future<void> marcarTodasLeidas() async {
+    await _api.patch('/notifications/me/read-all');
+  }
 }
 
 final memberRepositoryProvider = Provider<MemberRepository>((ref) {
@@ -86,3 +106,10 @@ final progressProvider = FutureProvider.autoDispose<List<RegistroFisico>>(
 /// Nombre y teléfono del gimnasio (para el mensaje de "cómo renovar").
 final gymSettingsProvider = FutureProvider.autoDispose<AppSettings>(
     (ref) => ref.watch(memberRepositoryProvider).settings());
+
+final notificationsProvider = FutureProvider.autoDispose<List<Notificacion>>(
+    (ref) => ref.watch(memberRepositoryProvider).notificaciones());
+
+/// Cantidad de avisos sin leer (para el contador de la campana).
+final unreadCountProvider = FutureProvider.autoDispose<int>(
+    (ref) => ref.watch(memberRepositoryProvider).noLeidas());

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_models/shared_models.dart';
+import '../../../providers/auth_provider.dart';
 import '../../../providers/settings_provider.dart';
 import 'settings_common.dart';
 
@@ -22,6 +23,7 @@ class _GimnasioTabState extends ConsumerState<GimnasioTab> {
   late bool _unDia;
   late bool _vencido;
   bool _guardando = false;
+  bool _generando = false;
   String? _error;
 
   @override
@@ -80,6 +82,22 @@ class _GimnasioTabState extends ConsumerState<GimnasioTab> {
     }
   }
 
+  /// Los avisos se generan solos (al iniciar el servidor y cada hora); este
+  /// botón los fuerza ahora mismo, útil para probar.
+  Future<void> _generarAvisos() async {
+    setState(() => _generando = true);
+    String texto;
+    try {
+      final r = await ref.read(apiClientProvider).post('/notifications/run-job');
+      texto = 'Listo: ${r['nuevas']} aviso(s) nuevo(s) generado(s).';
+    } on ApiException catch (e) {
+      texto = e.message;
+    }
+    if (!mounted) return;
+    setState(() => _generando = false);
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(texto)));
+  }
+
   @override
   Widget build(BuildContext context) {
     return TabScroll(
@@ -118,7 +136,7 @@ class _GimnasioTabState extends ConsumerState<GimnasioTab> {
         SeccionCard(
           titulo: 'Notificaciones de vencimiento',
           descripcion:
-              'Qué avisos recibirá el miembro cuando se active el envío de notificaciones push (próxima fase). Se guardan desde ya.',
+              'Qué avisos de vencimiento recibe el miembro en su app. Se generan solos al iniciar el servidor y cada hora.',
           child: Column(
             children: [
               SwitchListTile(
@@ -138,6 +156,17 @@ class _GimnasioTabState extends ConsumerState<GimnasioTab> {
                 title: const Text('Avisar cuando el plan venza'),
                 value: _vencido,
                 onChanged: (v) => setState(() => _vencido = v),
+              ),
+              const SizedBox(height: 8),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: OutlinedButton.icon(
+                  onPressed: _generando ? null : _generarAvisos,
+                  icon: const Icon(Icons.notifications_active_outlined),
+                  label: Text(_generando
+                      ? 'Generando...'
+                      : 'Generar avisos ahora'),
+                ),
               ),
             ],
           ),
