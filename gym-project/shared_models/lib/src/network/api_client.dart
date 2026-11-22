@@ -70,9 +70,16 @@ class ApiClient {
   Future<Map<String, dynamic>> post(
     String path, {
     Map<String, dynamic>? body,
+    Duration? timeout, // para llamadas lentas (ej. generar con IA)
   }) async {
     try {
-      final res = await _dio.post(path, data: body);
+      final res = await _dio.post(
+        path,
+        data: body,
+        options: timeout == null
+            ? null
+            : Options(receiveTimeout: timeout, sendTimeout: timeout),
+      );
       return _asMap(res.data);
     } on DioException catch (e) {
       throw _mapError(e);

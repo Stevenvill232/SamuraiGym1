@@ -186,7 +186,7 @@ class MemberDashboardScreen extends ConsumerWidget {
           title: const Text('Rutina del día'),
           subtitle: Text(d.tieneRutinaHoy
               ? 'Ya tienes una rutina generada para hoy'
-              : 'La generarás con el asistente de IA (próximamente)'),
+              : 'Genérala con el asistente de IA'),
           trailing: const Icon(Icons.chevron_right_rounded),
           onTap: () => context.go('/ai-chat'),
         ),
@@ -201,7 +201,7 @@ class MemberDashboardScreen extends ConsumerWidget {
           title: const Text('Alimentación sugerida'),
           subtitle: Text(d.tieneAlimentacionHoy
               ? 'Ya tienes una recomendación para hoy'
-              : 'Disponible con el asistente de IA (próximamente)'),
+              : 'Pídela al asistente de IA'),
           trailing: const Icon(Icons.chevron_right_rounded),
           onTap: () => context.go('/ai-chat'),
         ),

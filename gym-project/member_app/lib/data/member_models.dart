@@ -361,3 +361,122 @@ class Notificacion {
         fecha: DateTime.parse(j['fechaEnvio'] as String),
       );
 }
+
+// ---------------------------------------------------------------------- //
+// Asistente de IA
+// ---------------------------------------------------------------------- //
+
+class EjercicioIA {
+  final String nombre;
+  final int? series;
+  final String repeticiones;
+  final String descanso;
+  final String? notas;
+
+  const EjercicioIA({
+    required this.nombre,
+    this.series,
+    this.repeticiones = '',
+    this.descanso = '',
+    this.notas,
+  });
+
+  factory EjercicioIA.fromJson(Map<String, dynamic> j) => EjercicioIA(
+        nombre: (j['nombre'] as String?) ?? '',
+        series: (j['series'] as num?)?.toInt(),
+        repeticiones: (j['repeticiones'] ?? '').toString(),
+        descanso: (j['descanso'] ?? '').toString(),
+        notas: j['notas'] as String?,
+      );
+}
+
+class RutinaIA {
+  final String id;
+  final DateTime fecha;
+  final String? intensidad;
+  final String titulo;
+  final int? duracionMin;
+  final List<String> calentamiento;
+  final List<EjercicioIA> ejercicios;
+  final List<String> enfriamiento;
+  final List<String> recomendaciones;
+
+  const RutinaIA({
+    required this.id,
+    required this.fecha,
+    required this.titulo,
+    required this.ejercicios,
+    this.intensidad,
+    this.duracionMin,
+    this.calentamiento = const [],
+    this.enfriamiento = const [],
+    this.recomendaciones = const [],
+  });
+
+  factory RutinaIA.fromJson(Map<String, dynamic> j) {
+    final c = Map<String, dynamic>.from(j['contenido'] as Map);
+    return RutinaIA(
+      id: j['id'] as String,
+      fecha: DateTime.parse(j['fecha'] as String),
+      intensidad: j['intensidad'] as String?,
+      titulo: (c['titulo'] as String?) ?? 'Rutina',
+      duracionMin: (c['duracionMin'] as num?)?.toInt(),
+      calentamiento: _aLista(c['calentamiento']),
+      ejercicios: [
+        for (final e in (c['ejercicios'] as List? ?? []))
+          if (e is Map) EjercicioIA.fromJson(Map<String, dynamic>.from(e)),
+      ],
+      enfriamiento: _aLista(c['enfriamiento']),
+      recomendaciones: _aLista(c['recomendaciones']),
+    );
+  }
+}
+
+class AlimentoIA {
+  final String nombre;
+  final String porcion;
+  const AlimentoIA({required this.nombre, this.porcion = ''});
+}
+
+class ComidaIA {
+  final String id;
+  final DateTime fecha;
+  final String tipoComida; // DESAYUNO | MEDIA_MANANA | ALMUERZO | MERIENDA | CENA
+  final String titulo;
+  final int? caloriasAprox;
+  final List<AlimentoIA> alimentos;
+  final List<String> alternativas;
+  final List<String> recomendaciones;
+
+  const ComidaIA({
+    required this.id,
+    required this.fecha,
+    required this.tipoComida,
+    required this.titulo,
+    required this.alimentos,
+    this.caloriasAprox,
+    this.alternativas = const [],
+    this.recomendaciones = const [],
+  });
+
+  factory ComidaIA.fromJson(Map<String, dynamic> j) {
+    final c = Map<String, dynamic>.from(j['contenido'] as Map);
+    return ComidaIA(
+      id: j['id'] as String,
+      fecha: DateTime.parse(j['fecha'] as String),
+      tipoComida: (j['tipoComida'] as String?) ?? '',
+      titulo: (c['titulo'] as String?) ?? 'Sugerencia',
+      caloriasAprox: (c['caloriasAprox'] as num?)?.toInt(),
+      alimentos: [
+        for (final a in (c['alimentos'] as List? ?? []))
+          if (a is Map)
+            AlimentoIA(
+              nombre: (a['nombre'] ?? '').toString(),
+              porcion: (a['porcion'] ?? '').toString(),
+            ),
+      ],
+      alternativas: _aLista(c['alternativas']),
+      recomendaciones: _aLista(c['recomendaciones']),
+    );
+  }
+}

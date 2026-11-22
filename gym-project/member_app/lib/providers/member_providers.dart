@@ -83,6 +83,60 @@ class MemberRepository {
         .toList();
   }
 
+  // ---- Asistente de IA (las llamadas pueden tardar: se amplía el tiempo límite)
+  static const _esperaIA = Duration(seconds: 100);
+
+  Future<RutinaIA> generarRutina({
+    String? enfoque,
+    String? lugar,
+    String? intensidad,
+    int? minutos,
+    String? notas,
+  }) async {
+    final d = await _api.post('/ai/routine', timeout: _esperaIA, body: {
+      if (enfoque != null) 'enfoque': enfoque,
+      if (lugar != null) 'lugar': lugar,
+      if (intensidad != null) 'intensidad': intensidad,
+      if (minutos != null) 'minutos': minutos,
+      if (notas != null && notas.isNotEmpty) 'notas': notas,
+    });
+    return RutinaIA.fromJson(d);
+  }
+
+  Future<List<RutinaIA>> rutinas() async {
+    final data = await _api.getList('/ai/routines');
+    return data
+        .map((j) => RutinaIA.fromJson(Map<String, dynamic>.from(j as Map)))
+        .toList();
+  }
+
+  Future<ComidaIA> generarComida(String tipoComida, {String? notas}) async {
+    final d = await _api.post('/ai/nutrition', timeout: _esperaIA, body: {
+      'tipoComida': tipoComida,
+      if (notas != null && notas.isNotEmpty) 'notas': notas,
+    });
+    return ComidaIA.fromJson(d);
+  }
+
+  Future<List<ComidaIA>> comidas() async {
+    final data = await _api.getList('/ai/nutrition');
+    return data
+        .map((j) => ComidaIA.fromJson(Map<String, dynamic>.from(j as Map)))
+        .toList();
+  }
+
+  Future<String> chat(
+      String mensaje, List<({String rol, String texto})> historial) async {
+    final d = await _api.post('/ai/chat', timeout: _esperaIA, body: {
+      'mensaje': mensaje,
+      if (historial.isNotEmpty)
+        'historial': [
+          for (final t in historial) {'rol': t.rol, 'texto': t.texto},
+        ],
+    });
+    return (d['respuesta'] as String?) ?? '';
+  }
+
   Future<int> noLeidas() async {
     final d = await _api.get('/notifications/me/unread-count');
     return (d['count'] as num?)?.toInt() ?? 0;
@@ -124,3 +178,9 @@ final notificationsProvider = FutureProvider.autoDispose<List<Notificacion>>(
 /// Cantidad de avisos sin leer (para el contador de la campana).
 final unreadCountProvider = FutureProvider.autoDispose<int>(
     (ref) => ref.watch(memberRepositoryProvider).noLeidas());
+
+final rutinasProvider = FutureProvider.autoDispose<List<RutinaIA>>(
+    (ref) => ref.watch(memberRepositoryProvider).rutinas());
+
+final comidasProvider = FutureProvider.autoDispose<List<ComidaIA>>(
+    (ref) => ref.watch(memberRepositoryProvider).comidas());

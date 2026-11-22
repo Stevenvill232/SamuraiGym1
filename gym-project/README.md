@@ -137,7 +137,7 @@ detectadas" para la solución adoptada.
 
 La API key del proveedor de IA (Anthropic/OpenAI) vive **solo** en
 `backend/.env` (`AI_API_KEY`). Flutter nunca la ve ni la llama directamente:
-siempre pasa por el backend. Esto se implementa en la Fase 7.
+✅ Fase 7 — IA: rutinas personalizadas, sugerencias de comida y chat con el asistente
 
 ## Estado actual del proyecto
 

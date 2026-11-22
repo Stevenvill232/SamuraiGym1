@@ -277,6 +277,16 @@ token, así que un miembro no puede ver ni tocar datos de otro.
 | PATCH | `/notifications/:id/read` · `/notifications/me/read-all` | cualquiera autenticado | Marcar como leído(s) |
 | POST | `/notifications/run-job` | ADMIN | Genera los avisos ahora (para probar) |
 
+**Implementadas (Fase 7 — IA):**
+
+| Método | Ruta | Rol requerido | Descripción |
+|---|---|---|---|
+| POST | `/ai/routine` | cualquiera autenticado | Genera y guarda una rutina personalizada |
+| GET | `/ai/routines` | cualquiera autenticado | Historial de rutinas propias (20) |
+| POST | `/ai/nutrition` | cualquiera autenticado | Sugiere y guarda una comida (desayuno…cena) |
+| GET | `/ai/nutrition` | cualquiera autenticado | Historial de sugerencias propias (20) |
+| POST | `/ai/chat` | cualquiera autenticado | Chat con contexto del miembro (no se guarda) |
+
 **Planeadas por fase:**
 - Fase 6: `/notifications`, job diario (`@Cron`, no expuesto por HTTP) que
   recalcula estados de planes y dispara FCM.
@@ -358,7 +368,7 @@ token, así que un miembro no puede ver ni tocar datos de otro.
 | 4 | Planes y Pagos, Tiqueteras, Contabilidad, Tienda (backend + UI admin) | Listo |
 | 5 | Configuración (admin) + app de miembros completa: dashboard, línea de plan, perfil, progreso | Listo |
 | 6 | Notificaciones: avisos dentro de la app + job automático | Listo (el envío push por FCM queda pendiente) |
-| 7 | Integración de IA (rutina, alimentación, chat) | Pendiente |
+| 7 | Integración de IA (rutinas, alimentación y chat) | Listo |
 | 8 | Gráficos avanzados, pulido visual, pruebas, empaquetado final | Pendiente |
 
 Cada módulo nuevo se construirá siguiendo el mismo patrón ya usado en
@@ -492,3 +502,24 @@ se entra a la pantalla; Contabilidad y Dashboard tienen además botón
   o recién enviada a segundo plano, consulta cada 30 s `POST /notifications/me/claim`; el servidor devuelve los avisos
   recientes sin leer que aún no se habían mostrado y los marca como entregados (`entregadaAt`), de modo que nunca se
   repiten, ni siquiera tras reiniciar la app. Con la app cerrada del todo no llegan: eso requiere push (FCM).
+
+---
+
+## 12. Decisiones de la Fase 7 (IA)
+
+- **La clave nunca sale del backend.** `LlmService` llama por HTTP a Anthropic (Claude) u OpenAI según
+  `AI_PROVIDER`/`AI_API_KEY`/`AI_MODEL` de `backend/.env`; Flutter solo habla con nuestra API. Sin SDK: no agrega
+  dependencias. Sin clave, el asistente responde "no está configurado" en vez de fallar.
+- **Contexto personalizado y mínimo.** Edad, sexo, peso/estatura/IMC, perfil de entrenamiento y preferencias de
+  alimentación (los datos permanentes de la Fase 5). **No** se envían cédula, nombre ni correo a la IA.
+- **Datos permanentes vs. datos del momento.** Lo permanente sale del perfil; lo que cambia en cada solicitud
+  (enfoque, lugar, intensidad, tiempo, comida, notas) lo elige el miembro en la pantalla.
+- **Seguridad.** Prompt de sistema que obliga a: respetar lesiones, alergias y restricciones; no diagnosticar ni
+  recetar; derivar a un profesional ante dolor o condiciones médicas; hablar solo de entrenamiento y alimentación; y
+  tratar los datos del usuario como datos, no como instrucciones (mitiga inyección de prompts). Cada resultado lleva
+  el aviso "no reemplaza a un profesional".
+- **Salidas estructuradas y validadas.** Rutinas y comidas se piden como JSON, se extraen aunque vengan envueltas en
+  texto, se normalizan (longitudes, tipos) y, si la respuesta no sirve, se reintenta una vez. Se guardan en
+  `RutinaGenerada` / `RecomendacionAlimentaria` para tener historial; el Dashboard ya los muestra como "de hoy".
+- **Control de costo.** Máximo `AI_MAX_POR_HORA` (30) consultas por usuario por hora (ventana en memoria), tiempo
+  límite de 60 s hacia la IA y errores del proveedor traducidos a mensajes claros (el detalle técnico queda en el log).
