@@ -17,9 +17,9 @@ export interface MensajeLlm {
 const limpiar = (v?: string) => (v ?? '').trim().replace(/^["']|["']$/g, '').trim();
 
 /**
- * Cliente mínimo de IA (sin SDK, solo HTTP). Soporta Anthropic (Claude) y
+ * Cliente mínimo de IA (sin SDK, solo HTTP). Soporta Google (Gemini), Anthropic (Claude) y
  * OpenAI. La clave vive SOLO en backend/.env: la app nunca la ve.
- *   AI_PROVIDER = anthropic | openai     AI_API_KEY     AI_MODEL
+ *   AI_PROVIDER = google | anthropic | openai     AI_API_KEY     AI_MODEL
  *   AI_BASE_URL (opcional: proxy o pruebas)
  */
 @Injectable()
@@ -45,10 +45,11 @@ export class LlmService implements OnModuleInit {
     return limpiar(this.config.get<string>('AI_API_KEY'));
   }
   private get modelo() {
-    return (
-      limpiar(this.config.get<string>('AI_MODEL')) ||
-      (this.proveedor === 'openai' ? 'gpt-4o-mini' : 'claude-sonnet-5-5')
-    );
+    const configurado = limpiar(this.config.get<string>('AI_MODEL'));
+    if (configurado) return configurado;
+    if (this.proveedor === 'google') return 'gemini-2.5-flash';
+    if (this.proveedor === 'openai') return 'gpt-4o-mini';
+    return 'claude-sonnet-5-5';
   }
 
   get disponible() {
@@ -75,9 +76,13 @@ export class LlmService implements OnModuleInit {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 60_000);
     try {
-      return this.proveedor === 'openai'
-        ? await this.llamarOpenAi(opts.system, mensajes, maxTokens, !!opts.json, controller.signal)
-        : await this.llamarAnthropic(opts.system, mensajes, maxTokens, controller.signal);
+      if (this.proveedor === 'google') {
+        return await this.llamarGoogle(opts.system, mensajes, maxTokens, !!opts.json, controller.signal);
+      }
+      if (this.proveedor === 'openai') {
+        return await this.llamarOpenAi(opts.system, mensajes, maxTokens, !!opts.json, controller.signal);
+      }
+      return await this.llamarAnthropic(opts.system, mensajes, maxTokens, controller.signal);
     } catch (e) {
       if (e instanceof HttpException) throw e;
       this.logger.error(`Error llamando a la IA (${this.proveedor}): ${String(e)}`);
@@ -103,13 +108,78 @@ export class LlmService implements OnModuleInit {
     return salida;
   }
 
+
+private async llamarGoogle(
+  system: string,
+  mensajes: MensajeLlm[],
+  maxTokens: number,
+  json: boolean,
+  signal: AbortSignal,
+) {
+  const base = (
+    limpiar(this.config.get<string>('AI_BASE_URL')) ||
+    'https://generativelanguage.googleapis.com/v1beta'
+  ).replace(/\/+$/, '');
+
+  const url = `${base}/models/${encodeURIComponent(this.modelo)}:generateContent`;
+
+  const contents = mensajes.map((m) => ({
+    role: m.role === 'assistant' ? 'model' : 'user',
+    parts: [{ text: m.content }],
+  }));
+
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-goog-api-key': this.apiKey,
+    },
+    body: JSON.stringify({
+      ...(system
+        ? {
+            systemInstruction: {
+              parts: [{ text: system }],
+            },
+          }
+        : {}),
+      contents,
+      generationConfig: {
+        maxOutputTokens: maxTokens,
+        ...(json
+          ? { responseMimeType: 'application/json' }
+          : {}),
+      },
+    }),
+    signal,
+  });
+
+  const data: any = await res.json().catch(() => ({}));
+
+  if (!res.ok) {
+    this.fallar(res.status, data);
+  }
+
+  const texto = (data.candidates?.[0]?.content?.parts ?? [])
+    .map((p: any) => p.text ?? '')
+    .join('');
+
+  if (!texto.trim()) {
+    throw new BadGatewayException(
+      'La IA devolvió una respuesta vacía.',
+    );
+  }
+
+  return texto;
+}
+
+
   private async llamarAnthropic(
     system: string,
     mensajes: MensajeLlm[],
     maxTokens: number,
     signal: AbortSignal,
   ) {
-    const base = limpiar(this.config.get<string>('AI_BASE_URL')) || 'https://api.anthropic.com';
+    const base = limpiar(this.config.get<string>('https://generativelanguage.googleapis.com/v1beta')) || 'https://api.anthropic.com';
     const res = await fetch(`${base}/v1/messages`, {
       method: 'POST',
       headers: {
@@ -142,7 +212,7 @@ export class LlmService implements OnModuleInit {
     json: boolean,
     signal: AbortSignal,
   ) {
-    const base = limpiar(this.config.get<string>('AI_BASE_URL')) || 'https://api.openai.com';
+    const base = limpiar(this.config.get<string>('https://generativelanguage.googleapis.com/v1beta')) || 'https://api.openai.com';
     const res = await fetch(`${base}/v1/chat/completions`, {
       method: 'POST',
       headers: {
@@ -166,10 +236,10 @@ export class LlmService implements OnModuleInit {
 
   /** El detalle técnico va al log del servidor; al usuario, un mensaje claro. */
   private fallar(status: number, data: any): never {
-    this.logger.error(`La IA respondió ${status}: ${JSON.stringify(data).slice(0, 400)}`);
-    if (status === 401 || status === 403) {
+    this.logger.error(`La IA respondió ${status} (${this.proveedor} / ${this.modelo}): ${JSON.stringify(data).slice(0, 400)}`);
+    if (status === 401 || status === 403 || status === 400) {
       throw new ServiceUnavailableException(
-        'El asistente de IA no está disponible (credenciales del servidor inválidas).',
+        'El asistente de IA no está disponible (credenciales o configuración del servidor inválidas).',
       );
     }
     if (status === 429 || status === 529) {
