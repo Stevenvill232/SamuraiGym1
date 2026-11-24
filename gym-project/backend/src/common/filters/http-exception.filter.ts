@@ -42,7 +42,11 @@ export class HttpExceptionFilter implements ExceptionFilter {
 
     if (!isHttpException) {
       // Solo se loguea el detalle técnico en servidor; nunca se envía al cliente.
-      this.logger.error(exception);
+      const detalle =
+        exception instanceof Error
+          ? (exception.stack ?? exception.message)
+          : String(exception);
+      this.logger.error(`${request.method} ${request.url} -> ${detalle}`);
     }
 
     response.status(status).json({

@@ -34,7 +34,8 @@ model Role {
   nombre    String       @unique // ADMINISTRADOR, MIEMBRO, RECEPCION, ENTRENADOR, CONTADOR
   createdAt DateTime     @default(now())
 
-  usuarios  User[]
+  usuarios  User[]       @relation("RolPrincipal")
+  usuariosAdicionales User[] @relation("RolesAdicionales")
   permisos  Permission[] @relation("RolePermisos")
 
   @@map("roles")
@@ -79,15 +80,21 @@ model User {
   updatedAt       DateTime      @updatedAt
 
   roleId          String
-  role            Role          @relation(fields: [roleId], references: [id])
+  role            Role          @relation("RolPrincipal", fields: [roleId], references: [id])
+  // Roles ADICIONALES de la misma persona (ej. recepcionista que también es
+  // miembro). Invariante: si la persona tiene algún rol de personal, el rol
+  // principal (`role`) es de personal y MIEMBRO va aquí.
+  rolesAdicionales Role[]      @relation("RolesAdicionales")
 
   // Relaciones como MIEMBRO
   planes                  Plan[]                     @relation("PlanesDelMiembro")
   historialFisico         HistorialFisico[]
   preferenciaAlimentacion PreferenciaAlimentacion?
+  perfilEntrenamiento      PerfilEntrenamiento?
   rutinasGeneradas        RutinaGenerada[]
   recomendaciones         RecomendacionAlimentaria[]
   notificaciones          HistorialNotificacion[]
+  passwordResets          PasswordResetToken[]
   ingresosComoMiembro     Ingreso[]                  @relation("IngresoDelMiembro")
 
   // Relaciones como STAFF/ADMIN (quién registró qué)
@@ -123,15 +130,6 @@ enum EstadoPlan {
   AGOTADO
 }
 
-enum MetodoPago {
-  EFECTIVO
-  TRANSFERENCIA
-  NEQUI
-  DAVIPLATA
-  TARJETA
-  OTRO
-}
-
 model Plan {
   id               String     @id @default(uuid())
   miembroId        String
@@ -144,9 +142,10 @@ model Plan {
   diasTotales      Int?       // solo tiqueteras
   diasUtilizados   Int        @default(0) // solo tiqueteras
   estado           EstadoPlan @default(ACTIVO)
-  metodoPago       MetodoPago
-  horarioId        String?
+  metodoPago       String
+  horarioId        String? // OBSOLETO: usar `horarios`
   horario          Horario?   @relation(fields: [horarioId], references: [id])
+  horarios         PlanHorario[] // reemplaza a horarioId (se conserva solo por compatibilidad)
   observaciones    String?
   createdAt        DateTime   @default(now())
   updatedAt        DateTime   @updatedAt
@@ -199,6 +198,7 @@ model Horario {
   estado     Boolean   @default(true)
 
   planes Plan[]
+  planHorarios PlanHorario[]
 
   @@index([deporte])
   @@map("horarios")
@@ -231,7 +231,7 @@ model Ingreso {
   ventaId        String?     @unique
   venta          Venta?      @relation(fields: [ventaId], references: [id])
   valor          Decimal     @db.Decimal(10, 2)
-  metodoPago     MetodoPago
+  metodoPago     String
   usuarioAdminId String
   usuarioAdmin   User        @relation("IngresoRegistradoPor", fields: [usuarioAdminId], references: [id])
   observacion    String?
@@ -242,24 +242,13 @@ model Ingreso {
   @@map("ingresos")
 }
 
-enum CategoriaGasto {
-  LUZ
-  AGUA
-  NOMINA
-  ARRIENDO
-  INTERNET
-  MANTENIMIENTO
-  IMPLEMENTOS
-  OTRO
-}
-
 model Gasto {
   id          String         @id @default(uuid())
   fecha       DateTime       @default(now())
-  categoria   CategoriaGasto
+  categoria   String
   descripcion String
   valor       Decimal        @db.Decimal(10, 2)
-  metodoPago  MetodoPago
+  metodoPago  String
   observacion String?
   createdAt   DateTime       @default(now())
 
@@ -295,7 +284,7 @@ model Venta {
   id         String     @id @default(uuid())
   fecha      DateTime   @default(now())
   total      Decimal    @db.Decimal(10, 2)
-  metodoPago MetodoPago
+  metodoPago String
   usuarioId  String
   usuario    User       @relation("VentaRegistradaPor", fields: [usuarioId], references: [id])
 
@@ -344,10 +333,29 @@ model PreferenciaAlimentacion {
   alimentosNoConsumidos String[] @default([])
   alergias              String[] @default([])
   preferencias          String[] @default([])
+  alimentosNoGustan     String[] @default([])
+  restricciones         String[] @default([])
+  numeroComidas         Int?
   presupuesto           Decimal? @db.Decimal(10, 2)
   updatedAt             DateTime @updatedAt
 
   @@map("preferencias_alimentacion")
+}
+
+// Datos PERMANENTES para generar rutinas con IA (se piden una sola vez)
+model PerfilEntrenamiento {
+  miembroId        String   @id
+  miembro          User     @relation(fields: [miembroId], references: [id])
+  objetivo         String?
+  nivel            String? // PRINCIPIANTE | INTERMEDIO | AVANZADO
+  lesiones         String[] @default([])
+  equipamiento     String[] @default([])
+  diasDisponibles  String[] @default([])
+  minutosPorSesion Int?
+  preferencias     String[] @default([])
+  updatedAt        DateTime @updatedAt
+
+  @@map("perfil_entrenamiento")
 }
 
 model RutinaGenerada {
@@ -395,6 +403,10 @@ model HistorialNotificacion {
   tipo       String // 'VENCIMIENTO_PLAN' | 'TIQUETERA' | 'PAGO' | 'GENERAL'
   leida      Boolean  @default(false)
   fechaEnvio DateTime @default(now())
+  // "<planId>:<evento>" — evita enviar dos veces el mismo aviso automático
+  claveUnica String?  @unique
+  // Cuándo se mostró como notificación del teléfono (null = aún no)
+  entregadaAt DateTime?
 
   @@index([miembroId])
   @@map("historial_notificaciones")
@@ -411,4 +423,39 @@ model Configuracion {
   updatedAt DateTime @updatedAt
 
   @@map("configuracion")
+}
+
+// ----------------------------------------------------------------------------
+// Horarios de un plan de Boxeo/Karate/MMA (relación muchos a muchos): un
+// miembro puede entrenar 1, 2 o 3 días a la semana, cada uno en su horario.
+// ----------------------------------------------------------------------------
+
+model PlanHorario {
+  planId    String
+  plan      Plan    @relation(fields: [planId], references: [id])
+  horarioId String
+  horario   Horario @relation(fields: [horarioId], references: [id])
+
+  @@id([planId, horarioId])
+  @@index([horarioId])
+  @@map("plan_horarios")
+}
+
+// ----------------------------------------------------------------------------
+// Recuperación de contraseña por correo: se guarda solo el HASH del código de
+// 6 dígitos, con vencimiento, límite de intentos y un solo uso.
+// ----------------------------------------------------------------------------
+
+model PasswordResetToken {
+  id        String    @id @default(uuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id])
+  codeHash  String
+  expiresAt DateTime
+  attempts  Int       @default(0)
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+  @@map("password_reset_tokens")
 }

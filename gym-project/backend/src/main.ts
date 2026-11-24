@@ -10,10 +10,7 @@ async function bootstrap() {
   // Prefijo global: todas las rutas quedan bajo /api/...
   app.setGlobalPrefix('api');
 
-  // Valida y transforma automáticamente los DTOs de entrada.
-  // whitelist=true descarta cualquier campo no declarado en el DTO: es una
-  // capa de seguridad extra (regla de negocio: "no confiar en datos enviados
-  // desde Flutter").
+  
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,

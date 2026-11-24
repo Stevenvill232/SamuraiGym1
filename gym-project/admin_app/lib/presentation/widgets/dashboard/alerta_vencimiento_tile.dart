@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import 'package:shared_models/shared_models.dart';
 
 /// Refleja EXACTAMENTE la regla de negocio del proyecto:
@@ -43,7 +42,7 @@ class AlertaVencimientoTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final fecha = DateFormat('d MMM', 'es').format(alerta.fechaVencimiento);
+    final fecha = FormatoFecha.corta(alerta.fechaVencimiento);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(

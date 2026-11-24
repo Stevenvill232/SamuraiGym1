@@ -5,13 +5,11 @@ import {
   IsIn,
   IsOptional,
   IsString,
+  MaxLength,
   MinLength,
 } from 'class-validator';
 
-// Roles válidos al crear un usuario desde la app admin. MIEMBRO es el caso
-// más común; el resto se habilita cuando se necesiten (regla de negocio: el
-// sistema debe soportar Recepción/Entrenador/Contador sin reescribirse).
-const ROLES_VALIDOS = [
+export const ROLES_VALIDOS = [
   'ADMINISTRADOR',
   'MIEMBRO',
   'RECEPCION',
@@ -65,6 +63,7 @@ export class CreateUserDto {
   @ApiProperty({ example: 'PasswordSegura123' })
   @IsString()
   @MinLength(6)
+  @MaxLength(72)
   password: string;
 
   @ApiProperty({ example: 'MIEMBRO', enum: ROLES_VALIDOS })

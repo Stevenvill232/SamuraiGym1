@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'api_exception.dart';
 
@@ -48,7 +49,7 @@ class ApiClient {
   }) async {
     try {
       final res = await _dio.get(path, queryParameters: query);
-      return res.data as Map<String, dynamic>;
+      return _asMap(res.data);
     } on DioException catch (e) {
       throw _mapError(e);
     }
@@ -69,10 +70,17 @@ class ApiClient {
   Future<Map<String, dynamic>> post(
     String path, {
     Map<String, dynamic>? body,
+    Duration? timeout, // para llamadas lentas (ej. generar con IA)
   }) async {
     try {
-      final res = await _dio.post(path, data: body);
-      return res.data as Map<String, dynamic>;
+      final res = await _dio.post(
+        path,
+        data: body,
+        options: timeout == null
+            ? null
+            : Options(receiveTimeout: timeout, sendTimeout: timeout),
+      );
+      return _asMap(res.data);
     } on DioException catch (e) {
       throw _mapError(e);
     }
@@ -84,7 +92,19 @@ class ApiClient {
   }) async {
     try {
       final res = await _dio.patch(path, data: body);
-      return res.data as Map<String, dynamic>;
+      return _asMap(res.data);
+    } on DioException catch (e) {
+      throw _mapError(e);
+    }
+  }
+
+  Future<Map<String, dynamic>> put(
+    String path, {
+    Map<String, dynamic>? body,
+  }) async {
+    try {
+      final res = await _dio.put(path, data: body);
+      return _asMap(res.data);
     } on DioException catch (e) {
       throw _mapError(e);
     }
@@ -96,6 +116,15 @@ class ApiClient {
     } on DioException catch (e) {
       throw _mapError(e);
     }
+  }
+
+  
+  Map<String, dynamic> _asMap(dynamic data) {
+    if (data is Map) return Map<String, dynamic>.from(data);
+    if (data == null || (data is String && data.isEmpty)) {
+      return <String, dynamic>{};
+    }
+    return <String, dynamic>{'data': data};
   }
 
   ApiException _mapError(DioException e) {
@@ -111,10 +140,26 @@ class ApiClient {
         (data is Map && data['message'] != null) ? data['message'] : null;
 
     if (status == 401) {
-      return ApiException.credencialesInvalidas();
+      // Solo el login con datos incorrectos es "credenciales inválidas";
+      // un 401 en cualquier otra llamada significa que el token venció.
+      final esLogin = e.requestOptions.path.contains('/auth/login');
+      return esLogin
+          ? ApiException.credencialesInvalidas()
+          : ApiException.sesionExpirada();
+    }
+    if (status == 403) {
+      return ApiException.sinPermiso();
     }
     if (status != null && status >= 500) {
-      return ApiException.servidor();
+      // 503 = el servidor sabe qué pasó y trae un mensaje para el usuario
+      // (ej. "no se pudo enviar el correo").
+      if (status == 503 && backendMessage != null) {
+        return ApiException(backendMessage.toString(), statusCode: 503);
+      }
+      final detalle = kDebugMode
+          ? '${e.requestOptions.method} ${e.requestOptions.path} → $status'
+          : null;
+      return ApiException.servidor(detalle);
     }
 
     final msg = backendMessage is List

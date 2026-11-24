@@ -24,6 +24,9 @@ export class RolesGuard implements CanActivate {
     }
 
     const { user } = context.switchToHttp().getRequest();
-    return requiredRoles.includes(user?.role);
+    // Compatibilidad: un token anterior solo traía `role`.
+    const userRoles: string[] =
+      user?.roles ?? (user?.role ? [user.role] : []);
+    return requiredRoles.some((r) => userRoles.includes(r));
   }
 }

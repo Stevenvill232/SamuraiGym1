@@ -1,17 +1,8 @@
-import { ApiPropertyOptional, PartialType, OmitType } from '@nestjs/swagger';
-import { IsOptional, IsString } from 'class-validator';
+import { PartialType, OmitType } from '@nestjs/swagger';
 import { CreateUserDto } from './create-user.dto';
 
-// Al editar no se permite tocar la contraseña por este endpoint (hay uno
-// dedicado para cambio de contraseña) ni el rol se cambia por accidente
-// junto con datos personales.
+// La cédula es inmutable, la contraseña tiene su propio endpoint y los roles
+// se gestionan en PUT /users/:id/staff-roles (solo administrador).
 export class UpdateUserDto extends PartialType(
-  OmitType(CreateUserDto, ['password', 'role'] as const),
-) {
-  @ApiPropertyOptional({
-    description: 'Solo ADMINISTRADOR puede reasignar el rol de un usuario',
-  })
-  @IsOptional()
-  @IsString()
-  role?: string;
-}
+  OmitType(CreateUserDto, ['cedula', 'password', 'role'] as const),
+) {}

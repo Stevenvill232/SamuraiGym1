@@ -1,10 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_models/shared_models.dart';
 
-/// URL base del backend. En un dispositivo físico o emulador, "localhost"
-/// NO apunta a tu computador: usa la IP de tu máquina en la red local
-/// (ej. http://192.168.1.10:3000/api) o 10.0.2.2 para el emulador de Android.
-const String kApiBaseUrl = 'http://10.0.2.2:3000/api';
+
+const String kApiBaseUrl = 'http://172.26.143.100:3000/api';
 
 final apiClientProvider = Provider<ApiClient>((ref) {
   return ApiClient(baseUrl: kApiBaseUrl);
@@ -63,7 +61,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 
   // El miembro inicia sesión con cédula (identificador inmutable) +
-  // contraseña, tal como especifica el proyecto.
+  // contraseña
   Future<bool> login(String cedula, String password) async {
     state = state.copyWith(cargando: true, error: null);
     try {
