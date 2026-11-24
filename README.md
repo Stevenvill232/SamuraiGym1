@@ -426,5 +426,3 @@ build/
 Thumbs.db
 ```
 
-Antes de publicar, revisa que no hayan quedado **direcciones IP locales**, claves de API, contraseñas ni credenciales reales en el código (por ejemplo, en `kApiBaseUrl`).
-
