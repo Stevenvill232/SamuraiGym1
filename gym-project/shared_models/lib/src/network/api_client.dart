@@ -118,9 +118,7 @@ class ApiClient {
     }
   }
 
-  /// No toda respuesta es un objeto: algunas (ej. crear varios horarios)
-  /// devuelven una lista. Antes eso lanzaba un error de tipo DESPUÉS de que
-  /// el servidor ya había guardado, dejando el diálogo cargando para siempre.
+  
   Map<String, dynamic> _asMap(dynamic data) {
     if (data is Map) return Map<String, dynamic>.from(data);
     if (data == null || (data is String && data.isEmpty)) {
